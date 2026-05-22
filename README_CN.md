@@ -75,7 +75,7 @@ uv run python examples/full_pipeline_file.py
 
 ## 相关项目
 
-- [seekvfs](https://github.com/oceanbase/seekvfs) — 底层虚拟文件系统
+- [seekvfs](https://github.com/ob-labs/seekvfs) — 底层虚拟文件系统
 
 ## License
 

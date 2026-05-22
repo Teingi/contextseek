@@ -75,7 +75,7 @@ uv run python examples/full_pipeline_file.py
 
 ## Related Projects
 
-- [seekvfs](https://github.com/oceanbase/seekvfs) — underlying virtual filesystem
+- [seekvfs](https://github.com/ob-labs/seekvfs) — underlying virtual filesystem
 
 ## License
 
