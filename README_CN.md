@@ -1,7 +1,10 @@
 # ContextSeek
 
-[![License](https://img.shields.io/github/license/ob-labs/contextseek.svg)](LICENSE)
-[![CI](https://github.com/ob-labs/contextseek/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/ob-labs/contextseek/actions/workflows/main.yml?query=branch%3Amain)
+[![PyPI version](https://img.shields.io/pypi/v/contextseek)](https://pypi.org/project/contextseek/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/contextseek)](https://pypi.org/project/contextseek/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://pypi.org/project/contextseek/)
+[![License Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Discord](https://img.shields.io/badge/Discord-community-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/74cF8vbNEs)
 
 面向 AI Agent 的语义上下文基础设施。[English](README.md)
 
