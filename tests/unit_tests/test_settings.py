@@ -186,6 +186,7 @@ class TestFactory:
                     class_path="some_pkg.SomeEmbeddings",
                     model="test-model",
                     dims=768,
+                    kwargs={},
                 )
             )
 

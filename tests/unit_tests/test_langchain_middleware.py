@@ -200,7 +200,7 @@ class TestWrapModelCall:
         assert result == "response"
         ctx.retrieve.assert_called_once_with("What is OB?", scope="s", k=3)
         assert isinstance(captured["sys"], SystemMessage)
-        assert "[相关上下文]" in captured["sys"].content
+        assert "[Relevant Context]" in captured["sys"].content
         assert "OB is fast" in captured["sys"].content
         assert "vector + fts" in captured["sys"].content
         assert "You are helpful." in captured["sys"].content

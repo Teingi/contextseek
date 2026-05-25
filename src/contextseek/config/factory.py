@@ -121,8 +121,17 @@ def build_summarizer(
 
     if settings.provider == "llm":
         from contextseek.bridges.summarizer import LLMSummarizer
+        import warnings
 
-        effective_llm = llm if llm is not None else build_llm(LLMSettings())
+        try:
+            effective_llm = llm if llm is not None else build_llm(LLMSettings())
+        except Exception as exc:
+            warnings.warn(
+                f"build_summarizer: LLM init failed ({exc}); falling back to L2-only.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return None
         if effective_llm is None:
             return None
         return LLMSummarizer(
