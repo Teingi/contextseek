@@ -162,7 +162,7 @@ def main() -> None:
     plug = PowerMemPlug.from_records(records)
 
     print("=" * 72)
-    print("  SEEKCONTEXT × POWERMEM — DataPlug (插座) DEMO")
+    print("  CONTEXTSEEK × POWERMEM — DataPlug (插座) DEMO")
     print("=" * 72)
     print(f"\n[1/5] PowerMem 数据源: {source_label}")
     print(f"      导出 {len(records)} 条记忆 → PowerMemPlug.from_records()")

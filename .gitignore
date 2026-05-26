@@ -46,8 +46,8 @@ htmlcov/
 .cursor/
 .claude/
 
-# SeekContext local data
-.seekcontext/
+# ContextSeek local data
+.contextseek/
 .appworld/
 .appworld-cache/
 

@@ -105,7 +105,7 @@ class TestContextSeekSettings:
 
     def test_extra_fields_ignored(self, monkeypatch):
         """Unknown environment variables don't cause errors."""
-        monkeypatch.setenv("ZZZ_NOT_A_SEEKCONTEXT_VAR", "xyz")
+        monkeypatch.setenv("ZZZ_NOT_A_CONTEXTSEEK_VAR", "xyz")
         settings = ContextSeekSettings()
         assert settings.storage.backend == "memory"
 

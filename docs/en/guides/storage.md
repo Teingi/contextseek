@@ -32,7 +32,7 @@ Persists every `ContextItem` as a JSON file under a local directory. Backed by [
 
 ```env
 STORAGE_BACKEND=file
-STORAGE_PATH=.seekcontext/store
+STORAGE_PATH=.contextseek/store
 ```
 
 The directory is created automatically on first write. Each scope maps to a sub-directory; each item is a single `.json` file named by item ID.
@@ -92,9 +92,9 @@ The `TieredSeekVFSAdapter` wraps two backends: a hot tier for recent/active item
 
 ```env
 STORAGE_BACKEND=file
-STORAGE_PATH=.seekcontext/hot
+STORAGE_PATH=.contextseek/hot
 STORAGE_COLD_BACKEND=file
-STORAGE_COLD_PATH=.seekcontext/cold
+STORAGE_COLD_PATH=.contextseek/cold
 ```
 
 Writes always go to the hot tier. `compact()` moves archived items (ephemeral TTL expired, soft-deleted, low-importance) to cold. The cold tier is read during `retrieve()` unless `include_deleted=False` (default).
