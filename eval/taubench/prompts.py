@@ -1,7 +1,7 @@
 """Prompt templates for the tau-bench + ContextSeek evaluation agent."""
 
 # System prompt injected as wiki addendum — ContextSeek background section
-SEEKCONTEXT_CONTEXT_ADDON = """\
+CONTEXTSEEK_CONTEXT_ADDON = """\
 ## Available ContextSeek background from past tasks
 
 The following items may contain reusable domain knowledge, policy rule

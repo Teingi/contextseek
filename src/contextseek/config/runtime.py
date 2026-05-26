@@ -26,8 +26,8 @@ from contextseek.config.strategies import (
 from contextseek.observability.audit import AuditLog
 
 
-CONFIG_ENV = "SEEKCONTEXT_CONFIG"
-HOME_ENV = "SEEKCONTEXT_HOME"
+CONFIG_ENV = "CONTEXTSEEK_CONFIG"
+HOME_ENV = "CONTEXTSEEK_HOME"
 
 
 @dataclass(frozen=True)

@@ -77,7 +77,7 @@ with ctx.tag(
 
 ```env
 OBSERVABILITY_AUDIT_ENABLED=true
-OBSERVABILITY_AUDIT_PATH=.seekcontext/audit.jsonl
+OBSERVABILITY_AUDIT_PATH=.contextseek/audit.jsonl
 ```
 
 每条操作对应一条 `AuditRecord`，以 JSON Lines 格式追加写入，包含：

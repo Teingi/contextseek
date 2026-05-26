@@ -11,7 +11,7 @@ from eval.taubench import tau2_compat  # noqa: F401  # Python 3.13 compat
 from eval.taubench.adapters.base import TaskResult
 from eval.taubench.context import TauBenchContextSeekClient
 from eval.taubench.prompts import (
-    SEEKCONTEXT_CONTEXT_ADDON,
+    CONTEXTSEEK_CONTEXT_ADDON,
     TAUBENCH_SYSTEM_PROMPT_ADDON,
 )
 
@@ -197,7 +197,7 @@ class ContextSeekReactAdapter:
 
             # ── Augment system prompt with ContextSeek background ──
             if context_background:
-                context_section = SEEKCONTEXT_CONTEXT_ADDON.format(
+                context_section = CONTEXTSEEK_CONTEXT_ADDON.format(
                     context_background=context_background,
                 )
                 # orch.agent.init_messages[0] is the system prompt

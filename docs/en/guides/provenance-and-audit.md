@@ -77,7 +77,7 @@ All `add`, `retrieve`, `expand`, `compact`, `forget`, and `delete` calls inside 
 
 ```env
 OBSERVABILITY_AUDIT_ENABLED=true
-OBSERVABILITY_AUDIT_PATH=.seekcontext/audit.jsonl
+OBSERVABILITY_AUDIT_PATH=.contextseek/audit.jsonl
 ```
 
 Each `AuditRecord` (one per operation) is appended as a JSON line with:

@@ -66,7 +66,7 @@ def main() -> None:
     # Step 1: Initialize Storage & Client
     # ──────────────────────────────────────────────────────────────────────
     print("=" * 70)
-    print("  SEEKCONTEXT RESEARCH AGENT DEMO")
+    print("  CONTEXTSEEK RESEARCH AGENT DEMO")
     print("=" * 70)
 
     print("\n[Step 1] Initializing storage and client...")

@@ -32,7 +32,29 @@ def load_config(path: str) -> dict[str, Any]:
     """Load YAML config with ${VAR} environment substitution."""
     import yaml
 
-    with open(path) as f:
+    config_path = Path(path).expanduser()
+    if config_path.exists():
+        config_path = config_path.resolve()
+
+    # Best-effort: preload .env so ${VAR} placeholders can resolve without
+    # requiring users to manually export every variable.
+    try:
+        from dotenv import load_dotenv  # type: ignore
+
+        candidates: list[Path] = []
+        cwd_env = Path.cwd() / ".env"
+        if cwd_env.exists():
+            candidates.append(cwd_env)
+        if config_path.is_absolute() and len(config_path.parents) >= 4:
+            root_env = config_path.parents[3] / ".env"
+            if root_env.exists() and root_env not in candidates:
+                candidates.append(root_env)
+        for env_file in candidates:
+            load_dotenv(env_file, override=False)
+    except Exception:
+        pass
+
+    with open(config_path) as f:
         text = f.read()
 
     def replace_env(match: re.Match[str]) -> str:

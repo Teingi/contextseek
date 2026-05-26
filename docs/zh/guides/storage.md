@@ -32,7 +32,7 @@ STORAGE_BACKEND=memory
 
 ```env
 STORAGE_BACKEND=file
-STORAGE_PATH=.seekcontext/store
+STORAGE_PATH=.contextseek/store
 ```
 
 目录在首次写入时自动创建。每个 scope 对应一个子目录，每条 item 是以 item ID 命名的单个 `.json` 文件。
@@ -92,9 +92,9 @@ OPENAI_API_KEY=sk-...
 
 ```env
 STORAGE_BACKEND=file
-STORAGE_PATH=.seekcontext/hot
+STORAGE_PATH=.contextseek/hot
 STORAGE_COLD_BACKEND=file
-STORAGE_COLD_PATH=.seekcontext/cold
+STORAGE_COLD_PATH=.contextseek/cold
 ```
 
 写入始终进入热层。`compact()` 将已归档条目（超过 TTL 的 ephemeral 条目、软删除条目、低重要性陈旧条目）迁移至冷层。`retrieve()` 默认不读取冷层中的已删除条目（`include_deleted=False`）。
