@@ -300,7 +300,7 @@ class ObservabilitySettings(BaseSettings):
 
 
 class GeoSettings(BaseSettings):
-    """GIS feature configuration. Requires STORAGE_BACKEND=oceanbase and OceanBase >= 4.2.2."""
+    """GIS feature configuration. Requires STORAGE_BACKEND=oceanbase and OceanBase >= 4.2.2 (or seekdb)."""
 
     model_config = nested_section_config("GEO_")
 

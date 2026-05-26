@@ -20,7 +20,7 @@ Query patterns
 - Route corridor: keypoint decomposition (ST_Buffer unavailable on SRID 4326).
 - Zone gate: ``is_point_within_zone()`` – hard constraint check, not retrieval ranking.
 
-Requirements: OceanBase >= 4.2.2 (``_ST_MakeEnvelope`` introduced there).
+Requirements: OceanBase >= 4.2.2 (``_ST_MakeEnvelope`` introduced there) or seekdb.
 """
 
 from __future__ import annotations
@@ -115,7 +115,14 @@ class OceanBaseGeoBackend(OceanBaseBackend):
             return
         if row is None:
             return
-        m = re.search(r"OceanBase[^-]*-v(\d+)\.(\d+)\.(\d+)", str(row[0]), re.I)
+        version_str = str(row[0])
+        if re.search(r"seekdb", version_str, re.I):
+            logger.info(
+                "GIS: detected seekdb backend (%s); skipping OceanBase version check",
+                version_str,
+            )
+            return
+        m = re.search(r"OceanBase[^-]*-v(\d+)\.(\d+)\.(\d+)", version_str, re.I)
         if not m:
             return
         ver = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
@@ -123,7 +130,7 @@ class OceanBaseGeoBackend(OceanBaseBackend):
             raise RuntimeError(
                 f"OceanBase GIS requires version >= {'.'.join(str(v) for v in _MIN_VERSION)}, "
                 f"found {'.'.join(str(v) for v in ver)}. "
-                "Upgrade OceanBase or set GEO_ENABLED=false."
+                "Upgrade OceanBase (or use seekdb), or set GEO_ENABLED=false."
             )
 
     def _create_geo_table(self) -> None:

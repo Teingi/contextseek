@@ -135,6 +135,7 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
                     "layer": h.layer,
                     "summary": h.item.summary,
                     "content": h.item.content_text if h.layer == "full" else None,
+                    "tags": list[str](h.item.tags or []),
                     "provenance_summary": h.provenance_summary,
                     "stage_confidence": h.stage_confidence,
                     "recall_path": h.recall_path,

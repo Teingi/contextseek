@@ -9,7 +9,7 @@
 6. 证据链：路况事件如何影响决策层知识
 
 运行前提：
-- STORAGE_BACKEND=oceanbase（OB >= 4.2.2）
+- STORAGE_BACKEND=oceanbase（OB >= 4.2.2 或 seekdb）
 - GEO_ENABLED=true
 """
 

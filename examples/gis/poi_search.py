@@ -8,7 +8,7 @@
 5. 聚合附近 POI 到 knowledge 层（GeoAwareMerger）
 
 运行前提：
-- STORAGE_BACKEND=oceanbase（OB >= 4.2.2）
+- STORAGE_BACKEND=oceanbase（OB >= 4.2.2 或 seekdb）
 - GEO_ENABLED=true
 - LLM_PROVIDER=langchain（LLM 重排 + 摘要生成）
 - EMBEDDING_PROVIDER=langchain（向量召回）

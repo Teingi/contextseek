@@ -7,7 +7,7 @@
 4. 结合 Stage 演进：位置更新 extracted → 聚合 knowledge
 
 运行前提：
-- STORAGE_BACKEND=oceanbase（OB >= 4.2.2）
+- STORAGE_BACKEND=oceanbase（OB >= 4.2.2 或 seekdb）
 - GEO_ENABLED=true
 """
 

@@ -34,7 +34,7 @@ uv run python examples/advanced/research_agent.py  # 推荐：零外部依赖的
 
 ## [gis/](gis/) — 地理空间场景
 
-需要 OceanBase >= 4.2.2 且 `GEO_ENABLED=true`。
+需要 OceanBase >= 4.2.2（或 seekdb）且 `GEO_ENABLED=true`。
 
 | 文件 | 场景 |
 |---|---|

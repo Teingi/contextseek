@@ -4,7 +4,7 @@
 
 ## 运行前提（所有示例通用）
 
-- OceanBase >= 4.2.2
+- OceanBase >= 4.2.2 或 seekdb
 - 环境变量：
 
 ```bash
