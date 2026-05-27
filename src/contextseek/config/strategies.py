@@ -37,6 +37,14 @@ class RetrievalStrategy:
         ("extracted", 0.6),
         ("raw", 0.3),
     )
+    # Importance-aware ranking: importance^importance_alpha is used as a score
+    # multiplier so that lower-importance items rank lower even with high semantic
+    # similarity. alpha=0 disables the effect; alpha=0.5 gives sqrt-softened
+    # weighting; alpha=1.0 applies importance as a linear multiplier.
+    importance_alpha: float = 0.5
+    # Floor applied to importance before exponentiation, preventing items with
+    # very low importance from being completely suppressed (score → 0).
+    importance_floor: float = 0.1
     # Geo decay: distance decay unit in km for reranker spatial penalty
     distance_decay_km: float = 1.0
     # Rerank mode: "heuristic" (default) or "llm"
