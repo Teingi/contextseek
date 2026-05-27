@@ -51,20 +51,24 @@ except ImportError as exc:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 _GEO_TABLE_COLUMNS = """
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     ref        VARCHAR(1024) NOT NULL,
     namespace  VARCHAR(512)  NOT NULL,
     location   POINT         NOT NULL SRID 4326,
     geo_type   VARCHAR(32)   NULL,
-    geo_shape  GEOMETRY      NULL
+    geo_shape  GEOMETRY      NULL,
+    PRIMARY KEY (id)
 """
 
 _GEO_TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS `{table}` (
-    ref        VARCHAR(1024)  NOT NULL,
-    namespace  VARCHAR(512)   NOT NULL,
-    location   POINT          NOT NULL SRID 4326,
-    geo_type   VARCHAR(32)    NULL,
-    geo_shape  GEOMETRY       NULL,
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ref        VARCHAR(1024)   NOT NULL,
+    namespace  VARCHAR(512)    NOT NULL,
+    location   POINT           NOT NULL SRID 4326,
+    geo_type   VARCHAR(32)     NULL,
+    geo_shape  GEOMETRY        NULL,
+    PRIMARY KEY (id),
     SPATIAL INDEX sidx_location (location),
     INDEX idx_ref       (ref(255)),
     INDEX idx_namespace (namespace(255)),
