@@ -385,8 +385,8 @@ for h in hits_cm:
         print(f"           电耗约 {c.get('avg_battery_consumption_pct','?')}%，"
               f"置信度={c.get('confidence','?')}")
 
-print(f"\n✓ GIS 记忆生成完成")
+print("\n✓ GIS 记忆生成完成")
 print(f"  raw 层：{len(raw_items)} 条 GPS 停靠点")
 print(f"  extracted 层：{len(frequent_locations)} 个高频地点")
-print(f"  knowledge 层：3 个行为模式（通勤路径、周末活动、活动半径）")
-print(f"\n  → 运行 smart_swap.py 查看如何将 GIS 记忆用于智能换电推荐")
+print("  knowledge 层：3 个行为模式（通勤路径、周末活动、活动半径）")
+print("\n  → 运行 smart_swap.py 查看如何将 GIS 记忆用于智能换电推荐")

@@ -12,7 +12,6 @@
 """
 
 import os
-import time
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -27,7 +26,7 @@ os.environ.setdefault("GEO_DISTANCE_DECAY_KM", "1.0")
 os.environ.setdefault("RETRIEVAL_RECALL_ROUTES", '["phrase","terms","vector","geo"]')
 
 import contextseek as cs
-from contextseek.domain.geo import GeoPoint, GeoMetadata, GeoQuery
+from contextseek.domain.geo import GeoPoint, GeoQuery
 
 # ── 初始化客户端 ───────────────────────────────────────────────────────────────
 client = cs.ContextSeek.from_settings()

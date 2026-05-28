@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 import traceback
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from eval.taubench import tau2_compat  # noqa: F401  # Python 3.13 compat

@@ -147,12 +147,12 @@ nl_hits = client.retrieve(
     scope=SCOPE, k=3, full=True, geo_query=geo_q,
 )
 
-print(f"\n  关键词查询「餐厅 吃饭 好吃」：")
+print("\n  关键词查询「餐厅 吃饭 好吃」：")
 for h in kw_hits:
     c = h.item.content if isinstance(h.item.content, dict) else {}
     print(f"    [{h.score:.3f}] {c.get('name','?')}  评分={c.get('rating','?')}")
 
-print(f"\n  自然语言查询「附近找个口碑好的地方吃饭，最好评分高一点」：")
+print("\n  自然语言查询「附近找个口碑好的地方吃饭，最好评分高一点」：")
 for h in nl_hits:
     c = h.item.content if isinstance(h.item.content, dict) else {}
     abstract = h.item.abstract or ""

@@ -29,7 +29,7 @@ from pathlib import Path
 
 import seekvfs
 
-from contextseek import ContextSeek, SourceType, Stage, Link, LinkType
+from contextseek import ContextSeek, SourceType, Link, LinkType
 from contextseek.storage import FileBackend, SeekVFSStorageAdapter
 from contextseek.config.strategies import (
     CanaryRule,
@@ -37,8 +37,6 @@ from contextseek.config.strategies import (
     StrategyConfig,
     StrategyRouter,
 )
-from contextseek.evolution.engine import EvolutionEngine
-from contextseek.retrieval.orchestrator import RetrievalOrchestrator
 from contextseek.routing.resolver import ScopeResolver
 from contextseek.trace.export import TraceExporter
 

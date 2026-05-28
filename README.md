@@ -41,6 +41,20 @@ for hit in ctx.retrieve("distributed database", scope="acme/db/engineer", k=10):
 
 Configure via `.env` (see [.env.example](.env.example)) or `ContextSeekSettings` in code. A storage backend, an embedding provider, and an LLM are the three required pieces.
 
+## Development
+
+To auto-format Python files before each commit, enable the repository hook once:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+After that, each `git commit` will:
+
+- run `uv run ruff format` on staged `src/**/*.py` and `tests/**/*.py` files
+- re-stage any formatting changes automatically
+- run `uv run ruff check` and block the commit if lint errors remain
+
 ## Documentation
 
 - [Getting started (EN)](docs/en/getting-started/quickstart.md) / [快速上手 (ZH)](docs/zh/getting-started/quickstart.md): installation, `.env` setup, and a walkthrough of the core operations.

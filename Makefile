@@ -3,7 +3,7 @@ UV ?= uv
 UVICORN ?= $(PYTHON) -m uvicorn
 
 .PHONY: help \
-	install install-http install-all \
+	install install-http install-all install-hooks \
 	test test-unit test-integration test-cov \
 	lint format check \
 	build clean \
@@ -16,6 +16,7 @@ help:
 	@echo "  make install        # Base dependencies"
 	@echo "  make install-http   # + HTTP server extras"
 	@echo "  make install-all    # All extras (langchain, openai, oceanbase, http)"
+	@echo "  make install-hooks  # Enable git pre-commit auto-format hook"
 	@echo ""
 	@echo "Test:"
 	@echo "  make test               # All tests"
@@ -49,6 +50,9 @@ install-http:
 
 install-all:
 	$(UV) sync --extra http --extra langchain --extra openai --extra oceanbase
+
+install-hooks:
+	git config core.hooksPath .githooks
 
 # ── Test ──────────────────────────────────────────────────────────────────────
 

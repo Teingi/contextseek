@@ -168,7 +168,7 @@ def _generate_report(
     pass_hat_ks: dict[int, float],
 ) -> str:
     lines = [
-        f"# tau-bench Evaluation Report",
+        "# tau-bench Evaluation Report",
         "",
         f"**Experiment:** {experiment_name}",
         f"**Domain:** {domain}",
@@ -176,8 +176,8 @@ def _generate_report(
         "",
         "## Summary",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Total tasks | {summary['num_tasks']} |",
         f"| Total runs | {summary['total_runs']} |",
         f"| Successful runs | {summary['num_success']} |",
@@ -204,8 +204,8 @@ def _generate_report(
         lines.extend([
             "## ContextSeek Metrics",
             "",
-            f"| Metric | Value |",
-            f"|--------|-------|",
+            "| Metric | Value |",
+            "|--------|-------|",
             f"| Context items retrieved | {ctx['total_retrieved']} |",
             f"| Context items stored | {ctx['total_stored']} |",
             f"| Feedback applied | {ctx['total_feedback']} |",

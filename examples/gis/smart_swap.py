@@ -198,7 +198,6 @@ def query_nearby_stations(pos: GeoPoint, radius_km: float, k: int = 5) -> list:
 
 def is_in_activity_zone(pos: GeoPoint) -> bool:
     """判断是否在熟悉的活动半径内（直接计算与已知核心地点的距离）"""
-    from contextseek.domain.geo import dist_to_geo_sim
     # 基于已知高频地点列表做距离判断，避免 RRF 文本相似度干扰
     known_anchors = [HOME, OFFICE, WEEKEND_CLASS]
     for anchor in known_anchors:
@@ -224,7 +223,7 @@ cur_pos = GeoPoint(lat=OFFICE.lat + 0.0001, lon=OFFICE.lon + 0.0005)
 battery  = 38
 
 print(f"\n  当前位置 ({cur_pos.lat:.4f}, {cur_pos.lon:.4f})  |  电量 {battery}%")
-print(f"  时段: 工作日 18:20，准备下班")
+print("  时段: 工作日 18:20，准备下班")
 
 # Step 1: 查询位置记忆（我来这里多少次了？）
 loc_memory = query_location_memory(cur_pos, radius_km=0.5)
@@ -245,17 +244,17 @@ if loc_memory:
         sc   = best.item.content if isinstance(best.item.content, dict) else {}
 
         # ── 主动推送 ────────────────────────────────────────────────────────
-        print(f"\n  ┌─── 主动推送 ───────────────────────────────────────────────")
+        print("\n  ┌─── 主动推送 ───────────────────────────────────────────────")
         print(f"  │  您在「{loc_label}」（本月 {visit_count} 次），旁边 200m 就有换电站！")
-        print(f"  │")
+        print("  │")
         print(f"  │  📍 {sc.get('name','?')}")
         print(f"  │  ⚡ 第 {sc.get('generation','?')} 代站 · 换电约 {sc.get('swap_minutes','?')} 分钟")
         print(f"  │  🔋 当前可用电池 {sc.get('available_batteries','?')}/{sc.get('total_slots','?')}，无需排队")
         print(f"  │  🅿  免费停车 {sc.get('free_parking_hours','?')} 小时")
         print(f"  │  💡 {sc.get('note','')}")
-        print(f"  │")
-        print(f"  │  ▶ 顺路去换，无需导航，2 分钟步行距离")
-        print(f"  └──────────────────────────────────────────────────────────")
+        print("  │")
+        print("  │  ▶ 顺路去换，无需导航，2 分钟步行距离")
+        print("  └──────────────────────────────────────────────────────────")
 
         # 将推送事件写入记忆，供后续行为分析
         client.add(
@@ -307,7 +306,7 @@ cur_pos_2 = GeoPoint(lat=WEEKEND_CLASS.lat + 0.0002, lon=WEEKEND_CLASS.lon - 0.0
 battery_2 = 44
 
 print(f"\n  当前位置 ({cur_pos_2.lat:.4f}, {cur_pos_2.lon:.4f})  |  电量 {battery_2}%")
-print(f"  时段: 周六 09:33，刚送孩子进课外班")
+print("  时段: 周六 09:33，刚送孩子进课外班")
 
 loc_memory_2 = query_location_memory(cur_pos_2, radius_km=0.8)
 nearby_2     = query_nearby_stations(cur_pos_2, radius_km=2.0, k=5)
@@ -327,15 +326,15 @@ if loc_memory_2:
 
     if mall_hits:
         mc  = mall_hits[0].item.content
-        print(f"\n  ┌─── 个性化推荐 ────────────────────────────────────────────")
+        print("\n  ┌─── 个性化推荐 ────────────────────────────────────────────")
         print(f"  │  孩子上课 {wait_h:.0f}h，正好去换个电，顺便逛逛")
-        print(f"  │")
+        print("  │")
         print(f"  │  📍 {mc.get('name','?')}")
         print(f"  │  🏬 {mc.get('mall_name','?')}（{mc.get('mall_brands','')}）")
         print(f"  │  ⚡ 换电约 {mc.get('swap_minutes','?')} 分钟")
         print(f"  │  🅿  商场免停 {mc.get('free_parking_hours','?')} 小时（换电时间已包含在内）")
         print(f"  │  💡 {mc.get('note','')}")
-        print(f"  └──────────────────────────────────────────────────────────")
+        print("  └──────────────────────────────────────────────────────────")
     elif nearby_2:
         nc = nearby_2[0].item.content if isinstance(nearby_2[0].item.content, dict) else {}
         print(f"\n  最近换电站：{nc.get('name','?')}（无商场停车，常规推荐）")
@@ -358,7 +357,7 @@ unfamiliar_pos = GeoPoint(lat=30.9800, lon=121.2500)
 battery_3      = 28  # 电量较低，有紧迫感
 
 print(f"\n  当前位置 ({unfamiliar_pos.lat:.4f}, {unfamiliar_pos.lon:.4f})  |  电量 {battery_3}%")
-print(f"  时段: 工作日 14:15")
+print("  时段: 工作日 14:15")
 
 loc_memory_3  = query_location_memory(unfamiliar_pos, radius_km=2.0)
 in_zone_3     = is_in_activity_zone(unfamiliar_pos)
@@ -371,21 +370,21 @@ print(f"  位置记忆：{'命中' if loc_memory_3 else '无'}  "
       f"活动半径：{'熟悉' if in_zone_3 else '陌生'}")
 
 if not familiar:
-    print(f"\n  ┌─── 陌生区域推荐 ──────────────────────────────────────────")
+    print("\n  ┌─── 陌生区域推荐 ──────────────────────────────────────────")
     print(f"  │  您在不常去的区域，电量 {battery_3}%，建议尽快换电")
     if nearby_3:
         nc3 = nearby_3[0].item.content if isinstance(nearby_3[0].item.content, dict) else {}
-        print(f"  │")
+        print("  │")
         print(f"  │  📍 {nc3.get('name','?')}")
         print(f"  │  🔋 可用电池 {nc3.get('available_batteries','?')}/{nc3.get('total_slots','?')}")
         print(f"  │  ⏱ 预计等待 {nc3.get('est_wait_min','?')} 分钟")
-        print(f"  │  🗺  已开启导航（路线优先：最近 + 排队少）")
+        print("  │  🗺  已开启导航（路线优先：最近 + 排队少）")
     else:
-        print(f"  │  🗺  附近无换电站，已开启导航寻找更远的站点")
-    print(f"  └──────────────────────────────────────────────────────────")
+        print("  │  🗺  附近无换电站，已开启导航寻找更远的站点")
+    print("  └──────────────────────────────────────────────────────────")
 else:
     # 虽然不是常去地点但在熟悉半径内
-    print(f"\n  在熟悉半径内（非高频地点），按距离+等待时间推荐")
+    print("\n  在熟悉半径内（非高频地点），按距离+等待时间推荐")
     for h in nearby_3[:2]:
         nc = h.item.content if isinstance(h.item.content, dict) else {}
         print(f"    [{h.score:.3f}] {nc.get('name','?')} | "
@@ -457,10 +456,10 @@ if best_hw:
     print(f"     等待时间仅 {bc.get('est_wait_min','?')} 分钟，全程无焦虑")
 
 # 长续航短租提示
-print(f"\n  💡 换电还有另一个选择：")
-print(f"     当前 100kWh 标准电池，沪杭单程消耗约 22%，往返若不换电剩余较少")
-print(f"     蔚来 150kWh 超长续航短租 ¥129/天 → 沪杭往返全程不用停换，单次省 5 分钟")
-print(f"     长假或多次往返时性价比更高，出发前一站换入返回换出即可")
+print("\n  💡 换电还有另一个选择：")
+print("     当前 100kWh 标准电池，沪杭单程消耗约 22%，往返若不换电剩余较少")
+print("     蔚来 150kWh 超长续航短租 ¥129/天 → 沪杭往返全程不用停换，单次省 5 分钟")
+print("     长假或多次往返时性价比更高，出发前一站换入返回换出即可")
 
 
 print("\n✓ 智能换电推荐示例完成")

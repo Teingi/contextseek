@@ -1,0 +1,9 @@
+{
+  "dependencies": ["../../.[langchain,openai]"],
+  "graphs": {
+    "baseline": "./graph.py:baseline_graph",
+    "contextseek_agent": "./graph.py:contextseek_graph",
+    "contextseek_live": "./graph.py:contextseek_live_graph"
+  },
+  "env": ".env"
+}

@@ -45,6 +45,7 @@ htmlcov/
 *.log
 .cursor/
 .claude/
+.githooks/
 
 # ContextSeek local data
 .contextseek/
@@ -53,3 +54,9 @@ htmlcov/
 
 data/
 output/
+
+# Demo-local runtime artifacts (keep demo source tracked)
+examples/demo/.env
+examples/demo/.contextseek/
+examples/demo/__pycache__/
+examples/demo/.langgraph_api
