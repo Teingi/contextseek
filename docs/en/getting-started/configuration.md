@@ -144,6 +144,7 @@ OceanBase uses additional `OB_*` variables when built via runtime factory / exam
 | `EMBEDDING_CLASS_PATH` | — | e.g. `langchain_openai.OpenAIEmbeddings` |
 | `EMBEDDING_MODEL` | — | Model name for provider ctor |
 | `EMBEDDING_DIMS` | `0` | Required when provider ≠ `none` |
+| `EMBEDDING_BASE_URL` | (empty) | Optional base URL (for OpenAI-compatible endpoints, Ollama, etc.) |
 
 Provider API keys (`OPENAI_API_KEY`, `DASHSCOPE_API_KEY`, …) are read by LangChain classes, not by ContextSeek directly.
 
@@ -156,6 +157,7 @@ Used for rerank, summarizer, evolution, dream, conflict judge — any feature th
 | `LLM_PROVIDER` | `none` | `none` or `langchain` |
 | `LLM_CLASS_PATH` | — | e.g. `langchain_openai.ChatOpenAI` |
 | `LLM_MODEL` | — | Chat model name |
+| `LLM_BASE_URL` | (empty) | Optional base URL (for OpenAI-compatible endpoints, Ollama, etc.) |
 
 ### Summarizer (`SUMMARIZER_*`)
 

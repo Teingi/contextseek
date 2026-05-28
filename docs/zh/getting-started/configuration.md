@@ -138,6 +138,7 @@ OceanBase 另见 `OB_*` 与 [存储后端](../guides/storage.md)。
 | `EMBEDDING_CLASS_PATH` | — | 如 `langchain_openai.OpenAIEmbeddings` |
 | `EMBEDDING_MODEL` | — | 模型名 |
 | `EMBEDDING_DIMS` | `0` | 非 `none` 时必填 |
+| `EMBEDDING_BASE_URL` | （空） | 可选基地址（OpenAI 兼容端点、Ollama 等） |
 
 `OPENAI_API_KEY` 等由 LangChain 类读取，非 ContextSeek 直接解析。
 
@@ -150,6 +151,7 @@ OceanBase 另见 `OB_*` 与 [存储后端](../guides/storage.md)。
 | `LLM_PROVIDER` | `none` | `none` 或 `langchain` |
 | `LLM_CLASS_PATH` | — | 如 `langchain_openai.ChatOpenAI` |
 | `LLM_MODEL` | — | 对话模型名 |
+| `LLM_BASE_URL` | （空） | 可选基地址（OpenAI 兼容端点、Ollama 等） |
 
 ### Summarizer（`SUMMARIZER_*`）
 
