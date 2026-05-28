@@ -237,6 +237,19 @@ class HeuristicReranker:
             base *= geo_decay_score(
                 item_geo, geo_query.center, decay_km=strategy.distance_decay_km
             )
+        # Cap at 1.0 before applying importance, so that term_weight boosts
+        # cannot offset the importance penalty.
+        base = min(base, 1.0)
+        # Importance multiplier applied last: ensures a low-importance item
+        # never scores higher than a high-importance item of equal relevance,
+        # even after all additive bonuses (term_weight, feedback, etc.).
+        if strategy.importance_alpha > 0.0:
+            try:
+                importance = float(item.get("importance") or 1.0)
+            except (TypeError, ValueError):
+                importance = 1.0
+            importance = max(importance, strategy.importance_floor)
+            base *= importance**strategy.importance_alpha
         return round(base, 6)
 
 

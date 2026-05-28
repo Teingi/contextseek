@@ -255,6 +255,8 @@ class OceanBaseBackend(BackendProtocol):
         vidx_metric_type: str = "l2",
         fulltext_parser: str = "ngram",
         rrf_k: int = 60,
+        importance_alpha: float = 0.5,
+        importance_floor: float = 0.1,
     ) -> None:
         self._table_name = table_name
         self._vector_dims = int(vector_dims)
@@ -268,6 +270,8 @@ class OceanBaseBackend(BackendProtocol):
         self._vidx_metric_type = vidx_metric_type.lower()
         self._fulltext_parser = fulltext_parser
         self._rrf_k = int(rrf_k)
+        self._importance_alpha = float(importance_alpha)
+        self._importance_floor = float(importance_floor)
 
         self._obvector: ObVecClient | None = None
         self._table: Table | None = None
@@ -440,10 +444,24 @@ class OceanBaseBackend(BackendProtocol):
         }
         if abstract_emb is not None:
             record["abstract_embedding"] = abstract_emb
-        # Skip abstract_embedding when embedding is None so the row stays out of ANN recall.
+
+        table = self._table
 
         with self._obvector.engine.connect() as conn:
             with conn.begin():
+                # REPLACE INTO is DELETE + INSERT, which destroys the existing
+                # abstract_embedding when none is provided in the payload (e.g.
+                # during touch / access_count updates).  Preserve it by reading
+                # the stored vector first whenever the caller omits an embedding.
+                if abstract_emb is None:
+                    existing = conn.execute(
+                        select(table.c["abstract_embedding"])
+                        .where(table.c["ref"] == path)
+                        .limit(1)
+                    ).fetchone()
+                    has_existing_emb = existing is not None and existing[0] is not None
+                    if has_existing_emb:
+                        record["abstract_embedding"] = existing[0]
                 conn.execute(ReplaceStmt(self._table).values([record]))
 
     def read(self, path: str, hint: str | None = None) -> FileData:
@@ -693,23 +711,89 @@ class OceanBaseBackend(BackendProtocol):
 
         for rank, hit in enumerate(vec_hits, 1):
             doc_id = hit["_db_id"]
-            all_docs[doc_id] = {**hit, "_rrf": self._vector_weight / (k + rank)}
+            all_docs[doc_id] = {
+                **hit,
+                "_vec_rank": rank,
+                "_fts_rank": None,
+                "_rrf": 0.0,
+            }
 
         for rank, hit in enumerate(fts_hits, 1):
             doc_id = hit["_db_id"]
-            contrib = self._fts_weight / (k + rank)
             if doc_id in all_docs:
-                all_docs[doc_id]["_rrf"] += contrib
+                all_docs[doc_id]["_fts_rank"] = rank
             else:
-                all_docs[doc_id] = {**hit, "_rrf": contrib}
+                all_docs[doc_id] = {
+                    **hit,
+                    "_vec_rank": None,
+                    "_fts_rank": rank,
+                    "_rrf": 0.0,
+                }
 
-        ranked = sorted(all_docs.values(), key=lambda x: x["_rrf"], reverse=True)[
+        # Adaptive weight normalization (per-document fairness, à la powermem):
+        # Re-normalize each document's weights to sum to 1.0 based on how many
+        # retrieval paths actually returned it. This ensures vector-only and
+        # fts-only items are scored on the same scale as combined items,
+        # avoiding structural advantage from accumulating multiple path weights.
+        for doc in all_docs.values():
+            active: list[tuple[float, int]] = []  # (weight, rank)
+            if doc["_vec_rank"] is not None:
+                active.append((self._vector_weight, doc["_vec_rank"]))
+            if doc["_fts_rank"] is not None:
+                active.append((self._fts_weight, doc["_fts_rank"]))
+            if not active:
+                continue
+            total_w = sum(w for w, _ in active)
+            if total_w <= 0:
+                continue
+            doc["_rrf"] = sum((w / total_w) * (1.0 / (k + r)) for w, r in active)
+
+        def _parse_importance(doc: dict[str, Any]) -> float:
+            pj = doc.get("payload_json")
+            if isinstance(pj, str):
+                try:
+                    pj = json.loads(pj)
+                except (json.JSONDecodeError, TypeError):
+                    pj = {}
+            elif not isinstance(pj, dict):
+                pj = {}
+            try:
+                imp = float(pj.get("importance") or 1.0)
+            except (TypeError, ValueError):
+                imp = 1.0
+            return max(imp, self._importance_floor)
+
+        # Sort by importance-adjusted _rrf so that lower-importance items are
+        # deprioritized at the recall phase (before the :limit cut).  We store the
+        # adjusted key separately to avoid corrupting the raw _rrf used for
+        # normalization below.
+        if self._importance_alpha > 0.0:
+            for doc in all_docs.values():
+                imp = _parse_importance(doc)
+                doc["_sort_key"] = doc["_rrf"] * (imp**self._importance_alpha)
+        else:
+            for doc in all_docs.values():
+                doc["_sort_key"] = doc["_rrf"]
+
+        ranked = sorted(all_docs.values(), key=lambda x: x["_sort_key"], reverse=True)[
             :limit
         ]
 
+        # Batch-level max normalization on raw _rrf (importance-independent) so
+        # the top semantically-relevant item anchors the scale at 1.0.
+        max_rrf = float(ranked[0]["_rrf"]) if ranked else 1.0
+        if max_rrf <= 0.0:
+            max_rrf = 1.0
+
         hits: list[SearchHit] = []
         for doc in ranked:
-            score = round(float(doc["_rrf"]), 6)
+            norm = float(doc["_rrf"]) / max_rrf
+            # For vector-only items (no FTS/phrase match), multiply by the actual
+            # cosine similarity to preserve absolute semantic quality signal.
+            if doc["_fts_rank"] is None and doc["_vec_rank"] is not None:
+                vec_sim = float(doc.get("_vec_score", 1.0))
+                norm = norm * vec_sim
+            score = round(norm, 6)
             if score_threshold is not None and score < score_threshold:
                 continue
             payload_dict = _merge_hoisted(
