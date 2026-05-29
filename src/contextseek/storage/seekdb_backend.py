@@ -99,11 +99,15 @@ class SeekDBBackend(BackendProtocol):
         try:
             payload = json.loads(doc)
             scope = str(payload.get("scope", ""))
+            item_hash = str(payload["hash"]) if payload.get("hash") else ""
         except (json.JSONDecodeError, AttributeError):
             scope = ""
+            item_hash = ""
 
         _, bare = _split_scheme(path)
-        metadata = {"scope": scope, "bare_path": bare}
+        metadata: dict[str, Any] = {"scope": scope, "bare_path": bare}
+        if item_hash:
+            metadata["hash"] = item_hash
 
         with self._lock:
             self._collection.upsert(
@@ -212,6 +216,27 @@ class SeekDBBackend(BackendProtocol):
             out.append(FileInfo(path=id_, size=0, mtime=now, is_dir=False))
         out.sort(key=lambda fi: fi.path)
         return out
+
+    def find_by_hash(self, path_pattern: str, hash_value: str) -> str | None:
+        """Return the path of an item whose payload hash matches *hash_value*.
+
+        Uses metadata filtering (O(1) index lookup) instead of a full document
+        scan.  Returns ``None`` when no match exists or the collection is empty.
+        """
+        if not hash_value:
+            return None
+        try:
+            result = self._collection.get(
+                where={"hash": {"$eq": hash_value}},
+                include=[],
+            )
+            ids: list[str] = result.get("ids") or []
+            for id_ in ids:
+                if path_pattern is None or fnmatch.fnmatch(id_, path_pattern):
+                    return id_
+        except Exception:
+            pass
+        return None
 
     # ------------------------------------------------------------------
     # Search
