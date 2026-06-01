@@ -180,17 +180,26 @@ class DaemonProcess:
 
     def _write_status(self) -> None:
         import json as _json
+
         data = {
             "started_at": self._start_time.isoformat() if self._start_time else None,
-            "LifecycleScheduler": self._scheduler is not None and bool(getattr(self._scheduler, "running", False)),
-            "FileWatcher": self._watcher is not None and bool(getattr(self._watcher, "running", False)),
-            "MCP HTTP server": self._mcp_thread is not None and self._mcp_thread.is_alive(),
+            "LifecycleScheduler": self._scheduler is not None
+            and bool(getattr(self._scheduler, "running", False)),
+            "FileWatcher": self._watcher is not None
+            and bool(getattr(self._watcher, "running", False)),
+            "MCP HTTP server": self._mcp_thread is not None
+            and self._mcp_thread.is_alive(),
         }
         self._status_file.write_text(_json.dumps(data), encoding="utf-8")
 
     def _read_status(self) -> dict:
         import json as _json
-        default = {"LifecycleScheduler": False, "FileWatcher": False, "MCP HTTP server": False}
+
+        default = {
+            "LifecycleScheduler": False,
+            "FileWatcher": False,
+            "MCP HTTP server": False,
+        }
         if not self._status_file.exists():
             return default
         try:
@@ -226,7 +235,7 @@ class DaemonProcess:
             line = line.strip()
             if line.startswith("#") or not line.startswith(prefix):
                 continue
-            value = line[len(prefix):].strip().strip('"').strip("'")
+            value = line[len(prefix) :].strip().strip('"').strip("'")
         return value
 
     def _load_watch_paths(self) -> list[tuple[str, str]]:
@@ -243,7 +252,7 @@ class DaemonProcess:
             line = line.strip()
             if not line.startswith("WATCH_PATHS="):
                 continue
-            value = line[len("WATCH_PATHS="):].strip().strip('"').strip("'")
+            value = line[len("WATCH_PATHS=") :].strip().strip('"').strip("'")
             for entry in value.split(","):
                 entry = entry.strip()
                 if ":" in entry:

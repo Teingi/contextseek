@@ -16,6 +16,7 @@ from contextseek.domain.links import Link, LinkType
 from contextseek.domain.provenance import Provenance, SourceType
 from contextseek.domain.stages import Stage, Stability
 
+
 @dataclass
 class HeuristicDistillRule:
     """Thresholds for LLM-free skill distillation from plain text items.

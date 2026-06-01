@@ -232,9 +232,7 @@ class LifecycleScheduler:
                 self.on_event(event)
             return event
 
-    def _lint_scope(
-        self, scope: str
-    ) -> "tuple[Any | None, LifecycleEvent | None]":
+    def _lint_scope(self, scope: str) -> "tuple[Any | None, LifecycleEvent | None]":
         """Run lint health check on a scope and return (LintReport, event)."""
         try:
             from contextseek.evolution.lint import run_lint
@@ -295,11 +293,7 @@ class LifecycleScheduler:
                 return None
 
             # Build graph-structure-driven targets from lint hints (or fallback)
-            hints = (
-                lint_report.consolidation_hints
-                if lint_report is not None
-                else None
-            )
+            hints = lint_report.consolidation_hints if lint_report is not None else None
             dream_targets = pick_dream_targets(items, consolidation_hints=hints)
 
             engine = DreamEngine(

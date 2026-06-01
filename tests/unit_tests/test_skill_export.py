@@ -16,7 +16,9 @@ from contextseek.plugs.skills import _parse_skill_md
 # ---------------------------------------------------------------------------
 
 
-def _skill(name: str, body: str = "do the thing", *, confidence: float = 0.8) -> ContextItem:
+def _skill(
+    name: str, body: str = "do the thing", *, confidence: float = 0.8
+) -> ContextItem:
     return ContextItem(
         id=_generate_id(),
         content={
@@ -119,7 +121,9 @@ def test_prune_leaves_unmanaged_dirs_untouched(tmp_path: pathlib.Path) -> None:
     # Remove alpha → prune our export, but never touch handwritten/.
     export_skills(_StubClient([]), scope="me/work", out_dir=tmp_path)
 
-    assert (tmp_path / "handwritten" / "SKILL.md").read_text(encoding="utf-8") == "manual"
+    assert (tmp_path / "handwritten" / "SKILL.md").read_text(
+        encoding="utf-8"
+    ) == "manual"
     assert not (tmp_path / "alpha").exists()
 
 

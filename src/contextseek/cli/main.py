@@ -158,7 +158,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # lint
     lint_parser = subparsers.add_parser(
-        "lint", help="health-check the knowledge base: orphans, contradictions, distillation gaps"
+        "lint",
+        help="health-check the knowledge base: orphans, contradictions, distillation gaps",
     )
     lint_parser.add_argument("--scope", default=None)
     lint_parser.add_argument(
@@ -360,6 +361,7 @@ def run_cli(
         # Evolution stats from lifecycle log (last 7 days)
         import datetime as _dt
         from contextseek.daemon.logger import read_lifecycle_log
+
         _log_path = config_dir / "logs" / "lifecycle.jsonl"
         _entries = read_lifecycle_log(_log_path)
         _evolved = None
@@ -541,6 +543,7 @@ def run_cli(
                 entries = read_lifecycle_log(str(log_path))
                 if entries:
                     import datetime as _dt
+
                     ts = entries[-1].get("ts")
                     if ts:
                         try:
@@ -614,11 +617,17 @@ def run_cli(
         if args.show:
             # Side-by-side comparison for contradiction review
             id1, id2 = args.show
-            matched = {it.id: it for it in all_items if it.id.startswith(id1) or it.id.startswith(id2)}
+            matched = {
+                it.id: it
+                for it in all_items
+                if it.id.startswith(id1) or it.id.startswith(id2)
+            }
             for iid in (id1, id2):
                 it = next((v for k, v in matched.items() if k.startswith(iid)), None)
                 if it:
-                    print(f"\n  [{iid[:8]}] stage={it.stage.value}  access={it.access_count}")
+                    print(
+                        f"\n  [{iid[:8]}] stage={it.stage.value}  access={it.access_count}"
+                    )
                     print(f"  {it.content_text[:400]}")
                 else:
                     print(f"\n  [{iid[:8]}] not found")
@@ -633,6 +642,7 @@ def run_cli(
 
         # Human-readable output
         from contextseek.cli.overview_renderer import _divider
+
         print()
         print(f"  ContextSeek · {args.scope}  knowledge-base health check")
         print()
@@ -641,14 +651,20 @@ def run_cli(
             print(_divider("⚠ Potential contradictions"))
             for c in report.contradictions:
                 print(f"    #{c.item_a_id[:8]}  {c.preview_a[:60]!r}")
-                print(f"      ← #{c.item_b_id[:8]}  {c.preview_b[:60]!r}  (sim={c.similarity})")
-                print(f"      contextseek lint --scope {args.scope} --show {c.item_a_id[:8]} {c.item_b_id[:8]}")
+                print(
+                    f"      ← #{c.item_b_id[:8]}  {c.preview_b[:60]!r}  (sim={c.similarity})"
+                )
+                print(
+                    f"      contextseek lint --scope {args.scope} --show {c.item_a_id[:8]} {c.item_b_id[:8]}"
+                )
             print()
 
         if report.orphans:
             print(_divider("○ Orphan items"))
             for o in report.orphans[:10]:
-                print(f"    #{o.item_id[:8]}  stage={o.stage}  {o.content_preview[:60]!r}")
+                print(
+                    f"    #{o.item_id[:8]}  stage={o.stage}  {o.content_preview[:60]!r}"
+                )
             if len(report.orphans) > 10:
                 print(f"    ... and {len(report.orphans) - 10} more")
             if args.fix:
@@ -656,7 +672,9 @@ def run_cli(
                 for o in report.orphans:
                     ref = ctx.resolver.ref_for(args.scope, o.item_id)
                     try:
-                        ctx.forget(ref, scope=args.scope, reason="lint_auto_archive_orphan")
+                        ctx.forget(
+                            ref, scope=args.scope, reason="lint_auto_archive_orphan"
+                        )
                         archived += 1
                     except Exception:
                         pass
@@ -675,7 +693,9 @@ def run_cli(
         bar = "█" * (report.health_score // 10) + "░" * (10 - report.health_score // 10)
         print(f"  Health  {bar}  {report.health_score}/100")
         if not report.is_healthy():
-            print("  Run `contextseek compact` to distill items, or `contextseek dream` to consolidate knowledge.")
+            print(
+                "  Run `contextseek compact` to distill items, or `contextseek dream` to consolidate knowledge."
+            )
         print()
         return 0
 
@@ -830,6 +850,7 @@ def run_cli(
             import shutil
             import subprocess
             import time
+
             bin_path = shutil.which("contextseek") or sys.argv[0]
             cmd = [bin_path, "daemon", "start", "--foreground"]
             if getattr(args, "config_dir", None):
@@ -855,12 +876,14 @@ def run_cli(
         if args.daemon_command == "restart":
             daemon.stop()
             import time
+
             time.sleep(0.5)
             args.foreground = False
             args.daemon_command = "start"
             # re-enter start logic above via tail-call replacement
             import shutil
             import subprocess
+
             bin_path = shutil.which("contextseek") or sys.argv[0]
             cmd = [bin_path, "daemon", "start", "--foreground"]
             if getattr(args, "config_dir", None):

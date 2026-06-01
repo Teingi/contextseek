@@ -1818,7 +1818,9 @@ class ContextSeek:
         if embedder is None and settings.storage.backend == "seekdb":
             try:
                 import pyseekdb as _pyseekdb
+
                 _seekdb_ef = _pyseekdb.get_default_embedding_function()
+
                 def _seekdb_embed(text: str, _ef: Any = _seekdb_ef) -> list[float]:
                     return _ef([text])[0]
 

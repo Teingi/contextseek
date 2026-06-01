@@ -35,13 +35,15 @@ _NEGATION_PAIRS: list[tuple[frozenset[str], frozenset[str]]] = [
     ),
     # English
     (
-        frozenset({"not", "no", "cannot", "doesn't", "does not", "unsupported", "never"}),
+        frozenset(
+            {"not", "no", "cannot", "doesn't", "does not", "unsupported", "never"}
+        ),
         frozenset({"support", "supports", "can", "does", "yes", "always"}),
     ),
 ]
 
-_EMBED_SIM_THRESHOLD = 0.85   # cosine similarity when embeddings are present
-_TOKEN_SIM_THRESHOLD = 0.50   # Jaccard overlap when embeddings are absent
+_EMBED_SIM_THRESHOLD = 0.85  # cosine similarity when embeddings are present
+_TOKEN_SIM_THRESHOLD = 0.50  # Jaccard overlap when embeddings are absent
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +79,7 @@ class DistillOpportunity:
 @dataclass
 class ConsolidationHint:
     """Two items that are semantically similar enough to merge."""
+
     item_a_id: str
     item_b_id: str
     similarity: float
@@ -144,9 +147,7 @@ def _has_contradiction_signal(text_a: str, text_b: str) -> bool:
     """True when one text negates something the other affirms."""
     la, lb = text_a.lower(), text_b.lower()
     for neg_words, pos_words in _NEGATION_PAIRS:
-        if (
-            any(w in la for w in neg_words) and any(w in lb for w in pos_words)
-        ) or (
+        if (any(w in la for w in neg_words) and any(w in lb for w in pos_words)) or (
             any(w in la for w in pos_words) and any(w in lb for w in neg_words)
         ):
             return True

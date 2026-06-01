@@ -79,7 +79,9 @@ class EvolutionEngine:
                 strategy, "heuristic_distill_min_use", heuristic_distill_min_use
             )
             heuristic_distill_min_age_days = getattr(
-                strategy, "heuristic_distill_min_age_days", heuristic_distill_min_age_days
+                strategy,
+                "heuristic_distill_min_age_days",
+                heuristic_distill_min_age_days,
             )
             heuristic_distill_min_boost = getattr(
                 strategy, "heuristic_distill_min_boost", heuristic_distill_min_boost

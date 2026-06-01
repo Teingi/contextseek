@@ -154,10 +154,16 @@ def _maybe_merge_claude_desktop() -> None:
 
     print(f"  Found Claude Desktop config: {cfg_path}")
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
-        print("    Non-interactive session; add the contextseek entry from mcp.json manually.")
+        print(
+            "    Non-interactive session; add the contextseek entry from mcp.json manually."
+        )
         return
     try:
-        answer = input("  Merge contextseek into Claude Desktop config? [y/N] ").strip().lower()
+        answer = (
+            input("  Merge contextseek into Claude Desktop config? [y/N] ")
+            .strip()
+            .lower()
+        )
     except EOFError:
         answer = ""
     if answer not in ("y", "yes"):
@@ -167,7 +173,9 @@ def _maybe_merge_claude_desktop() -> None:
     # Back up before mutating, then merge the server entry.
     try:
         backup = cfg_path.with_suffix(cfg_path.suffix + ".contextseek.bak")
-        backup.write_text(json.dumps(existing, indent=2, ensure_ascii=False), encoding="utf-8")
+        backup.write_text(
+            json.dumps(existing, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         if not isinstance(existing.get("mcpServers"), dict):
             existing["mcpServers"] = {}
         existing["mcpServers"]["contextseek"] = server_entry
@@ -203,9 +211,7 @@ def run_init(config_dir: pathlib.Path) -> None:
     config_env = config_dir / "config.env"
     if not config_env.exists():
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        config_env.write_text(
-            _CONFIG_ENV_TEMPLATE.format(date=today), encoding="utf-8"
-        )
+        config_env.write_text(_CONFIG_ENV_TEMPLATE.format(date=today), encoding="utf-8")
         print(f"  Created  {config_env}")
     else:
         print(f"  Exists   {config_env}  (not overwritten)")
@@ -243,9 +249,7 @@ def run_init(config_dir: pathlib.Path) -> None:
     print()
     print("  Setup complete.  Next steps:")
     print(f"    1. Edit {config_env} to configure LLM/embedding (optional)")
-    print(
-        "    2. Add contextseek MCP to your AI tool using the snippet in mcp.json"
-    )
+    print("    2. Add contextseek MCP to your AI tool using the snippet in mcp.json")
     print("    3. Run `contextseek daemon status` to confirm the daemon is running")
 
 
@@ -265,7 +269,9 @@ def _register_systemd(config_dir: pathlib.Path, contextseek_bin: str) -> None:
     if shutil.which("systemctl"):
         try:
             subprocess.run(
-                ["systemctl", "--user", "daemon-reload"], check=True, capture_output=True
+                ["systemctl", "--user", "daemon-reload"],
+                check=True,
+                capture_output=True,
             )
             subprocess.run(
                 ["systemctl", "--user", "enable", "--now", "contextseek"],
@@ -275,9 +281,7 @@ def _register_systemd(config_dir: pathlib.Path, contextseek_bin: str) -> None:
             print("  systemd  contextseek.service enabled and started")
         except subprocess.CalledProcessError as exc:
             print(f"  systemd  service registration failed: {exc}")
-            print(
-                "  Manually enable with: systemctl --user enable --now contextseek"
-            )
+            print("  Manually enable with: systemctl --user enable --now contextseek")
     else:
         print(
             "  systemctl not found; service file written but not activated.\n"

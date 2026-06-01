@@ -16,6 +16,7 @@ from contextseek.evolution.lint import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _item(
     content: str = "test content",
     stage: Stage = Stage.raw,
@@ -48,7 +49,9 @@ def _item(
 
 def _skill_item(source_id: str) -> ContextItem:
     """Skill item that references source_id in provenance."""
-    it = _item(content={"skill_type": "prompt", "name": "test", "body": "x"}, stage=Stage.skill)
+    it = _item(
+        content={"skill_type": "prompt", "name": "test", "body": "x"}, stage=Stage.skill
+    )
     it.provenance = Provenance(
         source_type=SourceType.distillation,
         source_id=source_id,
@@ -115,12 +118,19 @@ class TestContradictionDetection:
         b.embedding = [0.98, 0.1, 0.0]
         report = run_lint([a, b], scope="test/scope")
         assert len(report.contradictions) == 1
-        pair_ids = {report.contradictions[0].item_a_id, report.contradictions[0].item_b_id}
+        pair_ids = {
+            report.contradictions[0].item_a_id,
+            report.contradictions[0].item_b_id,
+        }
         assert pair_ids == {a.id, b.id}
 
     def test_detects_english_negation_contradiction(self):
-        a = _item(content="OceanBase does not support transactions", stage=Stage.knowledge)
-        b = _item(content="OceanBase supports distributed transactions", stage=Stage.knowledge)
+        a = _item(
+            content="OceanBase does not support transactions", stage=Stage.knowledge
+        )
+        b = _item(
+            content="OceanBase supports distributed transactions", stage=Stage.knowledge
+        )
         a.embedding = [1.0, 0.0, 0.0]
         b.embedding = [0.98, 0.1, 0.0]
         report = run_lint([a, b], scope="test/scope")
@@ -128,7 +138,9 @@ class TestContradictionDetection:
 
     def test_similar_but_non_contradicting_items_not_flagged(self):
         a = _item(content="OceanBase supports MVCC isolation", stage=Stage.knowledge)
-        b = _item(content="OceanBase supports read-committed isolation", stage=Stage.knowledge)
+        b = _item(
+            content="OceanBase supports read-committed isolation", stage=Stage.knowledge
+        )
         a.embedding = [1.0, 0.0, 0.0]
         b.embedding = [0.99, 0.05, 0.0]
         report = run_lint([a, b], scope="test/scope")
@@ -168,32 +180,58 @@ class TestDistillOpportunity:
             relevance_boost=1.15,
             created_days_ago=4.0,
         )
-        rule = HeuristicDistillRule(min_access_count=5, min_age_days=3.0, min_relevance_boost=1.1)
+        rule = HeuristicDistillRule(
+            min_access_count=5, min_age_days=3.0, min_relevance_boost=1.1
+        )
         report = run_lint([item], scope="test/scope", heuristic_rule=rule)
         assert len(report.distill_opportunities) == 1
         assert report.distill_opportunities[0].item_id == item.id
 
     def test_skill_items_excluded_from_distill_opportunities(self):
-        item = _item(stage=Stage.skill, access_count=10, relevance_boost=1.5, created_days_ago=7.0)
+        item = _item(
+            stage=Stage.skill,
+            access_count=10,
+            relevance_boost=1.5,
+            created_days_ago=7.0,
+        )
         item.content = {"skill_type": "prompt", "name": "x", "body": "y"}
-        rule = HeuristicDistillRule(min_access_count=5, min_age_days=3.0, min_relevance_boost=1.1)
+        rule = HeuristicDistillRule(
+            min_access_count=5, min_age_days=3.0, min_relevance_boost=1.1
+        )
         report = run_lint([item], scope="test/scope", heuristic_rule=rule)
         assert len(report.distill_opportunities) == 0
 
     def test_insufficient_access_count_not_flagged(self):
-        item = _item(content="not enough access", stage=Stage.knowledge, access_count=2, relevance_boost=1.2, created_days_ago=5.0)
+        item = _item(
+            content="not enough access",
+            stage=Stage.knowledge,
+            access_count=2,
+            relevance_boost=1.2,
+            created_days_ago=5.0,
+        )
         rule = HeuristicDistillRule(min_access_count=5)
         report = run_lint([item], scope="test/scope", heuristic_rule=rule)
         assert len(report.distill_opportunities) == 0
 
     def test_too_young_item_not_flagged(self):
-        item = _item(content="too young", stage=Stage.knowledge, access_count=10, relevance_boost=1.2, created_days_ago=1.0)
+        item = _item(
+            content="too young",
+            stage=Stage.knowledge,
+            access_count=10,
+            relevance_boost=1.2,
+            created_days_ago=1.0,
+        )
         rule = HeuristicDistillRule(min_age_days=3.0)
         report = run_lint([item], scope="test/scope", heuristic_rule=rule)
         assert len(report.distill_opportunities) == 0
 
     def test_non_string_content_excluded(self):
-        item = _item(stage=Stage.knowledge, access_count=10, relevance_boost=1.5, created_days_ago=7.0)
+        item = _item(
+            stage=Stage.knowledge,
+            access_count=10,
+            relevance_boost=1.5,
+            created_days_ago=7.0,
+        )
         item.content = {"body": "structured"}
         rule = HeuristicDistillRule(min_access_count=5)
         report = run_lint([item], scope="test/scope", heuristic_rule=rule)
@@ -213,7 +251,10 @@ class TestConsolidationHints:
         b.embedding = [0.99, 0.1, 0.0]  # cosine ~0.995
         report = run_lint([a, b], scope="test/scope")
         assert len(report.consolidation_hints) == 1
-        pair = {report.consolidation_hints[0].item_a_id, report.consolidation_hints[0].item_b_id}
+        pair = {
+            report.consolidation_hints[0].item_a_id,
+            report.consolidation_hints[0].item_b_id,
+        }
         assert pair == {a.id, b.id}
 
     def test_low_similarity_items_produce_no_hint(self):
@@ -250,14 +291,14 @@ class TestHealthScore:
         assert report.health_score < 100
 
     def test_health_score_never_goes_below_zero(self):
-        items = (
-            [_item(content=f"orphan {i}") for i in range(20)]
-            + [
-                _item(content=f"not supported feature {i}", stage=Stage.knowledge,
-                      embedding=[1.0, float(i) * 0.001, 0.0])
-                for i in range(5)
-            ]
-        )
+        items = [_item(content=f"orphan {i}") for i in range(20)] + [
+            _item(
+                content=f"not supported feature {i}",
+                stage=Stage.knowledge,
+                embedding=[1.0, float(i) * 0.001, 0.0],
+            )
+            for i in range(5)
+        ]
         report = run_lint(items, scope="test/scope")
         assert report.health_score >= 0
 

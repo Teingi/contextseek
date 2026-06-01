@@ -73,8 +73,9 @@ class SeekDBBackend(BackendProtocol):
 
         ef = self._ef or pyseekdb.get_default_embedding_function()
 
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
-            io.StringIO()
+        with (
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
         ):
             if self._host:
                 admin = pyseekdb.AdminClient(host=self._host, port=self._port)
@@ -224,6 +225,7 @@ class SeekDBBackend(BackendProtocol):
     def sync_hashes_for_scope(self, scope: str) -> set[str]:
         """Return all known content hashes for *scope* (single indexed lookup)."""
         from pyseekdb.client.sql_utils import escape_string
+
         rows = self._sql(
             f"SELECT hash FROM contextseek_sync_hashes "
             f"WHERE scope = '{escape_string(scope)}'"
@@ -233,6 +235,7 @@ class SeekDBBackend(BackendProtocol):
     def sync_hash_add(self, scope: str, hash_val: str) -> None:
         """Record a content hash as synced (idempotent)."""
         from pyseekdb.client.sql_utils import escape_string
+
         self._sql(
             f"INSERT IGNORE INTO contextseek_sync_hashes (scope, hash) "
             f"VALUES ('{escape_string(scope)}', '{hash_val}')"
@@ -243,6 +246,7 @@ class SeekDBBackend(BackendProtocol):
         if not hashes:
             return
         from pyseekdb.client.sql_utils import escape_string
+
         esc_scope = escape_string(scope)
         values = ", ".join(f"('{esc_scope}', '{h}')" for h in hashes)
         self._sql(
@@ -252,6 +256,7 @@ class SeekDBBackend(BackendProtocol):
     def sync_files_for_scope(self, scope: str) -> dict[str, tuple[float, str]]:
         """Return ``{path: (mtime, content_hash)}`` ingest records for *scope*."""
         from pyseekdb.client.sql_utils import escape_string
+
         rows = self._sql(
             f"SELECT path, mtime, content_hash FROM contextseek_sync_files "
             f"WHERE scope = '{escape_string(scope)}'"
@@ -383,7 +388,7 @@ class SeekDBBackend(BackendProtocol):
             bare = self._bare_path(id_)
             if not bare.startswith(prefix):
                 continue
-            rel = bare[len(prefix):]
+            rel = bare[len(prefix) :]
             if not recursive and "/" in rel:
                 continue
             if pattern is not None and not fnmatch.fnmatch(rel, pattern):

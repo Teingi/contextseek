@@ -82,13 +82,16 @@ def suppress_backend_noise() -> Iterator[None]:
     except (AttributeError, OSError):
         out_filter = _FilteredStream(sys.stdout)
         err_filter = _FilteredStream(sys.stderr)
-        with contextlib.redirect_stdout(out_filter), contextlib.redirect_stderr(
-            err_filter
+        with (
+            contextlib.redirect_stdout(out_filter),
+            contextlib.redirect_stderr(err_filter),
         ):
             yield
         return
 
-    drop_markers = tuple(marker.encode("utf-8") for marker in _FilteredStream._DROP_MARKERS)
+    drop_markers = tuple(
+        marker.encode("utf-8") for marker in _FilteredStream._DROP_MARKERS
+    )
     originals: list[int] = []
     pipes: list[tuple[int, int, int]] = []
     threads: list[threading.Thread] = []
@@ -129,7 +132,7 @@ def suppress_backend_noise() -> Iterator[None]:
             sys.stderr.flush()
         except Exception:
             pass
-        for (fd, _read_fd, original_fd) in pipes:
+        for fd, _read_fd, original_fd in pipes:
             os.dup2(original_fd, fd)
         for thread in threads:
             thread.join(timeout=0.5)
@@ -186,7 +189,9 @@ def render_retrieve(scope: str, query: str, response: Any) -> None:
     hits = list(response)
     if console:
         console.print()
-        console.print(f"[bold cyan]ContextSeek[/bold cyan] [dim]· {scope}[/dim] retrieve")
+        console.print(
+            f"[bold cyan]ContextSeek[/bold cyan] [dim]· {scope}[/dim] retrieve"
+        )
         console.print(f"[dim]query[/dim] {query!r}")
         console.print()
 
@@ -224,7 +229,9 @@ def render_retrieve(scope: str, query: str, response: Any) -> None:
             )
 
         if response.meta.hint:
-            console.print(Panel(response.meta.hint, title="Hint", border_style="yellow"))
+            console.print(
+                Panel(response.meta.hint, title="Hint", border_style="yellow")
+            )
         return
 
     print()
@@ -250,7 +257,9 @@ def render_retrieve(scope: str, query: str, response: Any) -> None:
         print()
 
 
-def render_daemon_status(info: dict[str, Any], *, evolved: int | None = None, merged: int | None = None) -> None:
+def render_daemon_status(
+    info: dict[str, Any], *, evolved: int | None = None, merged: int | None = None
+) -> None:
     """Render daemon status in a consistent table."""
     if console:
         if info["running"]:
@@ -264,7 +273,9 @@ def render_daemon_status(info: dict[str, Any], *, evolved: int | None = None, me
         table.add_column("Component")
         table.add_column("Status")
         for name, ok in info.get("components", {}).items():
-            table.add_row(name, "[green]running[/green]" if ok else "[dim]stopped[/dim]")
+            table.add_row(
+                name, "[green]running[/green]" if ok else "[dim]stopped[/dim]"
+            )
         if evolved is not None and merged is not None:
             table.add_row("Evolution (7d)", f"evolved={evolved}  merged={merged}")
         console.print(Panel(table, title=title, subtitle=subtitle, border_style="cyan"))
@@ -312,7 +323,9 @@ class SyncProgress:
     def update(self, added: int, skipped: int, total: int) -> None:
         if self._progress is None:
             if total == 0:
-                print("\r  loading existing hashes ...              ", end="", flush=True)
+                print(
+                    "\r  loading existing hashes ...              ", end="", flush=True
+                )
                 return
             done = added + skipped
             pct = int(done * 100 / total) if total else 100

@@ -20,14 +20,33 @@ if TYPE_CHECKING:
 
 # Extensions treated as plain-text code (block-split, no AST)
 _CODE_EXTENSIONS: set[str] = {
-    ".py", ".pyi",
-    ".js", ".jsx", ".ts", ".tsx",
-    ".go", ".java", ".kt", ".scala",
-    ".c", ".cpp", ".cc", ".h", ".hpp",
-    ".rs", ".swift",
-    ".sh", ".bash", ".zsh",
-    ".yaml", ".yml", ".toml", ".ini", ".env",
-    ".rst", ".tex",
+    ".py",
+    ".pyi",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".go",
+    ".java",
+    ".kt",
+    ".scala",
+    ".c",
+    ".cpp",
+    ".cc",
+    ".h",
+    ".hpp",
+    ".rs",
+    ".swift",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".env",
+    ".rst",
+    ".tex",
     ".sql",
 }
 
@@ -251,14 +270,17 @@ def _parse_python_file(p: pathlib.Path) -> list[str]:
 
         if isinstance(node, ast.ClassDef):
             methods = [
-                n.name for n in ast.walk(node)
+                n.name
+                for n in ast.walk(node)
                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
             ]
             body = f"  methods: {', '.join(methods[:10])}" if methods else ""
             text = f"[{p.name} :: {node.name}]\n{sig_line}\n{docstring}\n{body}".strip()
         else:
             # Function: include first few body lines after docstring
-            body_start = node.body[0].end_lineno + 1 if docstring else node.body[0].lineno
+            body_start = (
+                node.body[0].end_lineno + 1 if docstring else node.body[0].lineno
+            )
             body_lines = lines[body_start - 1 : body_start + 4]
             body_preview = "\n".join(line for line in body_lines if line.strip())
             text = f"[{p.name} :: {node.name}]\n{sig_line}\n{docstring}\n{body_preview}".strip()
@@ -347,9 +369,8 @@ def _parse_file_auto(p: pathlib.Path) -> list[tuple[str, str]]:
             data = None
         if isinstance(data, dict) and "mapping" in data:
             return _parse_chatgpt_json(p)
-        if (
-            isinstance(data, list)
-            or (isinstance(data, dict) and "conversations" in data)
+        if isinstance(data, list) or (
+            isinstance(data, dict) and "conversations" in data
         ):
             return _parse_claude_json(p)
 
@@ -467,6 +488,7 @@ def _resolve_seekdb_backend(ctx: "ContextSeek") -> "Any | None":
     """Return the SeekDBBackend if the active adapter uses one, else None."""
     try:
         from contextseek.storage.seekdb_backend import SeekDBBackend
+
         router = ctx.adapter._vfs._router
         _, route = router.resolve("contextseek://")
         backend = route.get("backend") if isinstance(route, dict) else None

@@ -149,7 +149,9 @@ def _daemon_available(base: str, timeout: float = 1.0) -> bool:
         return False
 
 
-def _post_message(base: str, request: dict[str, Any], timeout: float = 30.0) -> dict[str, Any]:
+def _post_message(
+    base: str, request: dict[str, Any], timeout: float = 30.0
+) -> dict[str, Any]:
     """Forward one JSON-RPC request to the daemon's ``/message`` endpoint."""
     data = json.dumps(request, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(

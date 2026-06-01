@@ -148,9 +148,7 @@ def render_overview(
     lines: list[str] = []
 
     lines.append("")
-    lines.append(
-        f"  ContextSeek · {scope}  ({backend_label})"
-    )
+    lines.append(f"  ContextSeek · {scope}  ({backend_label})")
     lines.append("")
 
     # ── Skills ──────────────────────────────────────────────────────────────
@@ -161,11 +159,11 @@ def render_overview(
             uses = item.access_count
             conf = item.effective_confidence or item.provenance.confidence
             bar = _confidence_bar(conf)
-            lines.append(
-                f"    {name:<38}  {uses:>3} uses  ·  {bar}  {conf:.2f}"
-            )
+            lines.append(f"    {name:<38}  {uses:>3} uses  ·  {bar}  {conf:.2f}")
     else:
-        lines.append("    No skills yet.  Keep using ContextSeek — they will emerge automatically.")
+        lines.append(
+            "    No skills yet.  Keep using ContextSeek — they will emerge automatically."
+        )
 
     lines.append("")
 
@@ -192,7 +190,9 @@ def render_overview(
     ready_to_distill = sum(
         1 for it in knowledge_items if it.access_count >= distill_threshold
     )
-    warming = sum(1 for it in knowledge_items if 3 <= it.access_count < distill_threshold)
+    warming = sum(
+        1 for it in knowledge_items if 3 <= it.access_count < distill_threshold
+    )
     pending = report.pending_extraction + report.pending_convergence
     evolved_ago = _format_elapsed(last_evolution)
     next_hint = _next_evolution_hint(
@@ -208,12 +208,13 @@ def render_overview(
     lines.append(f"    raw → extracted        {report.pending_extraction} ready")
     lines.append(f"    extracted → knowledge  {report.pending_convergence} ready")
     lines.append(
-        f"    knowledge → skill      {ready_to_distill} ready"
-        f" · {warming} warming"
+        f"    knowledge → skill      {ready_to_distill} ready · {warming} warming"
     )
     lines.append(f"    recent activity        last evolved {evolved_ago}")
     if raw_count or extracted_count:
-        lines.append(f"    current inputs         raw={raw_count} extracted={extracted_count}")
+        lines.append(
+            f"    current inputs         raw={raw_count} extracted={extracted_count}"
+        )
     lines.append(f"    next                   {next_hint}")
     lines.append("")
 
@@ -231,9 +232,7 @@ def render_overview(
                 f"    {count} item{'s' if count != 1 else ''} may be ready"
                 " to distill into skills."
             )
-        lines.append(
-            f"    └─ contextseek lint --scope {scope}  for item-level details"
-        )
+        lines.append(f"    └─ contextseek lint --scope {scope}  for item-level details")
         lines.append("")
 
     # ── Accumulated ─────────────────────────────────────────────────────────
