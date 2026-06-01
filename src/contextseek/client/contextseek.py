@@ -632,6 +632,7 @@ class ContextSeek:
         filters: dict[str, Any] | None = None,
         include_deleted: bool = False,
         geo_query: "Any | None" = None,
+        min_score: float | None = None,
     ) -> RetrieveResponse:
         """Search stored context; defaults to L1 summaries, ``full=True`` returns L2 bodies.
 
@@ -690,6 +691,7 @@ class ContextSeek:
             tags=tag_filter,
             include_deleted=include_deleted,
             geo_query=geo_query,
+            min_score=min_score,
         )
         hits = self._filter_readable_hits(hits, scope=scope)
         if min_conf is not None:
@@ -1903,6 +1905,7 @@ class ContextSeek:
                     if llm_distill_enabled
                     else None
                 ),
+                summarizer=summarizer,
             )
 
         # 5. Build audit log

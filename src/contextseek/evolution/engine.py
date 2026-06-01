@@ -38,6 +38,7 @@ class EvolutionEngine:
         merge_synthesize_fn: Callable[[list[str]], str] | None = None,
         distill_decide_fn: Callable[[ContextItem], bool] | None = None,
         distill_render_fn: Callable[[ContextItem], dict[str, str]] | None = None,
+        summarizer: Any | None = None,
     ):
         self._rules = rules or DEFAULT_RULES
 
@@ -105,6 +106,7 @@ class EvolutionEngine:
             llm_distill_fn=distill_render_fn,
             heuristic_rule=default_heuristic_rule,
         )
+        self._summarizer = summarizer
 
     def evolve(
         self, items: list[ContextItem]
@@ -131,7 +133,12 @@ class EvolutionEngine:
         ]
         for item in raw_traces:
             extracted = self._extractor.extract(item)
-            new_items.extend(extracted)
+            if extracted:
+                new_items.extend(extracted)
+                item.searchable = False
+                item.superseded_by = extracted[0].id
+                item.updated_at = datetime.now(timezone.utc)
+                archived_items.append(item)
         report.evolved_count += len(new_items)
 
         # Phase 2: extracted → knowledge (convergence merge)
@@ -151,6 +158,21 @@ class EvolutionEngine:
             archived_items.extend(archived)
             report.merged_count += len(archived)
             report.evolved_count += len(new_knowledge)
+
+            if self._summarizer is not None:
+                for it in new_knowledge:
+                    if it.abstract is None:
+                        it.abstract = self._summarizer.abstract(it.content_text)
+                        it.summary = self._summarizer.summary(it.content_text)
+            else:
+                # When synthesize_fn has already written content as a natural
+                # language string, use it directly as abstract/summary to ensure
+                # middleware injection and semantic retrieval can match this
+                # knowledge entry.
+                for it in new_knowledge:
+                    if it.abstract is None and isinstance(it.content, str):
+                        it.abstract = it.content
+                        it.summary = it.content
 
         # Phase 3: knowledge → skill (distillation)
         knowledge_items = [
