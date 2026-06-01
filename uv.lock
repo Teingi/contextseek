@@ -329,6 +329,7 @@ langchain = [
     { name = "langchain" },
     { name = "langchain-core" },
     { name = "langgraph" },
+    { name = "langsmith" },
 ]
 oceanbase = [
     { name = "pyobvector" },
@@ -370,6 +371,7 @@ requires-dist = [
     { name = "langchain-openai", marker = "extra == 'openai'", specifier = ">=0.3.0" },
     { name = "langgraph", marker = "extra == 'all'", specifier = ">=0.2.0" },
     { name = "langgraph", marker = "extra == 'langchain'", specifier = ">=0.2.0" },
+    { name = "langsmith", marker = "extra == 'langchain'", specifier = ">=0.1.0" },
     { name = "openai", marker = "extra == 'appworld-eval'", specifier = ">=1.0.0" },
     { name = "pydantic", specifier = ">=2.7.0" },
     { name = "pydantic", marker = "extra == 'all'", specifier = ">=2.7.0" },

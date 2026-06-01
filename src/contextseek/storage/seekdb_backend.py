@@ -15,7 +15,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Any
 
-from seekvfs import BackendProtocol, SCHEME
+from seekvfs import BackendProtocol
 from seekvfs.exceptions import NotFoundError
 from seekvfs.models import FileData, FileInfo, GrepMatch, SearchHit, SearchResult
 

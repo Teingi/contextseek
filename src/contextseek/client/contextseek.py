@@ -1819,7 +1819,10 @@ class ContextSeek:
             try:
                 import pyseekdb as _pyseekdb
                 _seekdb_ef = _pyseekdb.get_default_embedding_function()
-                embedder = lambda text, _ef=_seekdb_ef: _ef([text])[0]
+                def _seekdb_embed(text: str, _ef: Any = _seekdb_ef) -> list[float]:
+                    return _ef([text])[0]
+
+                embedder = _seekdb_embed
             except Exception:
                 pass
 

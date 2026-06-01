@@ -280,7 +280,7 @@ def render_daemon_status(info: dict[str, Any], *, evolved: int | None = None, me
     else:
         print("  contextseek daemon  ·  not running")
     if evolved is not None and merged is not None:
-        print(f"\n  Evolution stats (last 7 days)")
+        print("\n  Evolution stats (last 7 days)")
         print(f"    Evolved items: {evolved}  ·  Merged duplicates: {merged}")
 
 

@@ -2,19 +2,12 @@
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
-from contextseek.domain.context_item import ContextItem, _generate_id, _utc_now
-from contextseek.domain.links import Link, LinkType
+from contextseek.domain.context_item import ContextItem, _generate_id
 from contextseek.domain.provenance import Provenance, SourceType
 from contextseek.domain.stages import Stage
 from contextseek.evolution.distiller import HeuristicDistillRule
 from contextseek.evolution.lint import (
-    ConsolidationHint,
-    Contradiction,
-    DistillOpportunity,
-    LintReport,
-    OrphanItem,
     run_lint,
 )
 

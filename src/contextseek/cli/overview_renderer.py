@@ -7,7 +7,7 @@ accumulated item statistics.  No third-party dependencies required.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from contextseek.domain.context_item import ContextItem
 from contextseek.domain.results import EvolutionReport
@@ -115,7 +115,7 @@ def _next_evolution_hint(
         return "keep retrieving these items until they reach the skill threshold"
     if skills == 0:
         return 'contextseek retrieve --query "..." then contextseek feedback --item-id <id> --score 1'
-    return f"contextseek daemon status  # check automatic evolution"
+    return "contextseek daemon status  # check automatic evolution"
 
 
 def render_overview(

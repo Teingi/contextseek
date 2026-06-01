@@ -260,7 +260,7 @@ def _parse_python_file(p: pathlib.Path) -> list[str]:
             # Function: include first few body lines after docstring
             body_start = node.body[0].end_lineno + 1 if docstring else node.body[0].lineno
             body_lines = lines[body_start - 1 : body_start + 4]
-            body_preview = "\n".join(l for l in body_lines if l.strip())
+            body_preview = "\n".join(line for line in body_lines if line.strip())
             text = f"[{p.name} :: {node.name}]\n{sig_line}\n{docstring}\n{body_preview}".strip()
 
         if len(text) > 30:
@@ -280,7 +280,9 @@ def _parse_generic_code_file(p: pathlib.Path) -> list[str]:
         block = block.strip()
         # Skip short lines or pure-comment blocks with no substance
         if len(block) > 40 and not all(
-            l.lstrip().startswith(("#", "//", "*", "--")) for l in block.splitlines() if l.strip()
+            line.lstrip().startswith(("#", "//", "*", "--"))
+            for line in block.splitlines()
+            if line.strip()
         ):
             chunks.append(f"[{p.name}]\n{block}")
     return chunks

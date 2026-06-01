@@ -7,7 +7,6 @@ warning when watchdog is not installed.
 
 from __future__ import annotations
 
-import threading
 import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
 _WATCHDOG_AVAILABLE = False
 try:
     from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler, FileSystemEvent
+    from watchdog.events import FileSystemEventHandler
 
     _WATCHDOG_AVAILABLE = True
 except ImportError:
