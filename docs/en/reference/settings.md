@@ -56,15 +56,15 @@ Shared LLM client used by: reranker, summarizer, evolution engine, dream engine,
 
 ## Summarizer (`SUMMARIZER_*`)
 
-Drives L0 `abstract` and L1 `summary` generation on every `add()`.
+Drives L2 `abstract` and L1 `summary` generation on every `add()`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SUMMARIZER_PROVIDER` | `llm` | `none` (disabled) or `llm` (uses `LLM_*`) |
-| `SUMMARIZER_L0_MAX_CHARS` | `100` | Character budget for L0 abstract |
+| `SUMMARIZER_L2_MAX_CHARS` | `100` | Character budget for L2 abstract |
 | `SUMMARIZER_L1_MAX_CHARS` | `2000` | Character budget for L1 summary |
 
-When `SUMMARIZER_PROVIDER=llm` but no LLM is configured, the summarizer is skipped and a one-time warning is emitted. Retrieval falls back to L2-only behavior.
+When `SUMMARIZER_PROVIDER=llm` but no LLM is configured, the summarizer is skipped and a one-time warning is emitted. Retrieval falls back to L0-only behavior.
 
 ## Retrieval (`RETRIEVAL_*`)
 
@@ -118,7 +118,7 @@ Override any LLM prompt template. Placeholders vary by template (`{query}`, `{co
 
 | Variable | Template purpose |
 |----------|-----------------|
-| `PROMPT_SUMMARIZER_ABSTRACT_TEMPLATE` | L0 abstract generation |
+| `PROMPT_SUMMARIZER_ABSTRACT_TEMPLATE` | L2 abstract generation |
 | `PROMPT_SUMMARIZER_SUMMARY_TEMPLATE` | L1 summary generation |
 | `PROMPT_RETRIEVAL_RELEVANCE_TEMPLATE` | LLM reranker scoring |
 | `PROMPT_CONFLICT_JUDGE_TEMPLATE` | Contradiction detection on write |

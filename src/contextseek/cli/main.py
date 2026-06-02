@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     retrieve_parser = subparsers.add_parser(
         "retrieve",
-        help="retrieve ranked SearchHits (L1 summaries by default; --full for L2)",
+        help="retrieve ranked SearchHits (L1 summaries by default; --full for L0)",
     )
     retrieve_parser.add_argument("--scope", required=True)
     retrieve_parser.add_argument("--query", required=True)
@@ -35,12 +35,12 @@ def build_parser() -> argparse.ArgumentParser:
     retrieve_parser.add_argument(
         "--full",
         action="store_true",
-        help="return L2 full content instead of L1 summaries",
+        help="return L0 full content instead of L1 summaries",
     )
 
     expand_parser = subparsers.add_parser(
         "expand",
-        help="expand previously-retrieved item ids to L2 full content",
+        help="expand previously-retrieved item ids to L0 full content",
     )
     expand_parser.add_argument("--scope", required=True)
     expand_parser.add_argument(

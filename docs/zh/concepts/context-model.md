@@ -32,16 +32,16 @@ item = ctx.add(
 |------|------|
 | `id` | 自动生成的 hex ID |
 | `scope` | 租户/项目/主体路径 |
-| `content` | L2：字符串或可 JSON 序列化的 dict |
+| `content` | L0：字符串或可 JSON 序列化的 dict |
 
 **可检索**
 
 | 字段 | 说明 |
 |------|------|
-| `abstract` | L0（约 100 字）— 向量索引输入 |
+| `abstract` | L2（约 100 字）— 向量索引输入 |
 | `summary` | L1（约 2k 字）— `retrieve()` 默认返回 |
 | `tags` | 过滤维度；检索时须**全部匹配** |
-| `embedding` | L0（无则 L2）的向量 |
+| `embedding` | L2（无则 L0）的向量 |
 | `searchable` | 归档/软删后为 `False` |
 | `relevance_boost` | `feedback()` 正向反馈累积的得分乘数 |
 

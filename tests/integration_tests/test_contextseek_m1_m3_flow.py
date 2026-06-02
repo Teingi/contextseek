@@ -70,7 +70,7 @@ def test_m1_to_m3_context_flow() -> None:
     assert matched[0].layer == "summary"
     assert matched[0].item.summary == long_item.summary
 
-    # full=True returns the full L2 content
+    # full=True returns the full L0 content
     full_response = ctx.retrieve("budget sentinel", scope=scope, k=5, full=True)
     matched_full = [h for h in full_response if h.item.id == long_item.id]
     assert matched_full and matched_full[0].layer == "full"

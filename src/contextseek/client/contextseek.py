@@ -91,7 +91,7 @@ def _warn_no_summarizer_once() -> None:
         return
     _NO_SUMMARIZER_WARNED = True
     warnings.warn(
-        "SUMMARIZER_PROVIDER not configured; returning full L2 content. "
+        "SUMMARIZER_PROVIDER not configured; returning full L0 content. "
         "Configure SUMMARIZER_PROVIDER=llm + LLM_API_KEY for layered retrieval.",
         UserWarning,
         stacklevel=3,
@@ -121,7 +121,7 @@ def _auto_build_summarizer() -> Any | None:
     """Try to build a Summarizer from global env/settings.
 
     Returns ``None`` when no LLM is configured, so the dataclass default
-    behaviour (flat L2-only) is preserved.
+    behaviour (flat L0-only) is preserved.
     """
     from contextseek.config.factory import build_summarizer
     from contextseek.config.settings import SummarizerSettings
@@ -247,7 +247,7 @@ class ContextSeek:
     """Optional embedding function: text -> vector."""
 
     summarizer: Any | None = None
-    """Optional Summarizer: generates L0 abstract + L1 overview before embedding."""
+    """Optional Summarizer: generates L2 abstract + L1 overview before embedding."""
 
     llm: Any | None = None
     """Optional shared LLM for advanced ranking/evolution/classification hooks."""
@@ -449,7 +449,7 @@ class ContextSeek:
             links=links or [],
         )
 
-        # Step 1 (early): generate L0 abstract + L1 summary so the embedder has
+        # Step 1 (early): generate L2 abstract + L1 summary so the embedder has
         # a tight surface to work with. Step 2 (early): embed the abstract /
         # content. Both run before conflict detection so we can use the
         # embedding to ANN-narrow the candidate set instead of full-scanning.
@@ -575,9 +575,9 @@ class ContextSeek:
         geo_query: "Any | None" = None,
         min_score: float | None = None,
     ) -> RetrieveResponse:
-        """Search stored context; defaults to L1 summaries, ``full=True`` returns L2 bodies.
+        """Search stored context; defaults to L1 summaries, ``full=True`` returns L0 bodies.
 
-        Without a summarizer the API degrades to L2-only (empty summary fields and
+        Without a summarizer the API degrades to L0-only (empty summary fields and
         ``layer`` naturally ``"full"``), and ``warnings.warn`` is emitted once to
         prompt configuration.
 
@@ -585,7 +585,7 @@ class ContextSeek:
             query: Natural-language query.
             scope: Search scope (prefix).
             k: Maximum hits to return.
-            full: When True, ``hit.item.content`` carries the L2 body; when False
+            full: When True, ``hit.item.content`` carries the L0 body; when False
                 (default) L1 summaries replace content to save tokens—call
                 :meth:`expand` to upgrade to full text.
             stage: Optional stage filter.
@@ -694,7 +694,7 @@ class ContextSeek:
         return RetrieveResponse(items=hits, meta=meta)
 
     def expand(self, hits: list[SearchHit]) -> list[ContextItem]:
-        """Upgrade a list of ``SearchHit`` rows to L2 full text.
+        """Upgrade a list of ``SearchHit`` rows to L0 full text.
 
         Storage paths are derived from ``hit.item.scope`` + ``hit.item.id``—no
         extra scope argument is required. Typical usage::
@@ -707,7 +707,7 @@ class ContextSeek:
             hits: ``SearchHit`` objects from :meth:`retrieve` (may be a subset).
 
         Returns:
-            ``ContextItem`` list with L2 ``content`` filled; skips unreadable rows.
+            ``ContextItem`` list with L0 ``content`` filled; skips unreadable rows.
         """
         adapter = self.adapter
         if not hasattr(adapter, "read"):
@@ -735,7 +735,7 @@ class ContextSeek:
         return result
 
     def expand_by_ids(self, ids: list[str], scope: str) -> list[ContextItem]:
-        """Upgrade bare item ids to L2 full text.
+        """Upgrade bare item ids to L0 full text.
 
         For callers that cannot pass :class:`SearchHit` instances (MCP / HTTP
         bridges, etc.). Behavior matches :meth:`expand` aside from argument shape.
@@ -745,7 +745,7 @@ class ContextSeek:
             scope: Scope that owns the ids (used to build storage paths).
 
         Returns:
-            ``ContextItem`` list with L2 ``content`` filled; skips missing ids.
+            ``ContextItem`` list with L0 ``content`` filled; skips missing ids.
         """
         adapter = self.adapter
         if not hasattr(adapter, "read"):

@@ -57,10 +57,10 @@ contextseek:
       base_url: ${LLM_BASE_URL}
       temperature: 0.0
   summarizer:
-    # LLM 生成 L0 abstract / L1 summary，embedding 打在 abstract 上。
+    # LLM 生成 L2 abstract / L1 summary，embedding 打在 abstract 上。
     # 若不想多一次 LLM：provider: none
     provider: llm
-    l0_max_chars: 800
+    l2_max_chars: 800
     l1_max_chars: 2000
   retrieval:
     default_k: 20

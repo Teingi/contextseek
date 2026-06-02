@@ -53,7 +53,7 @@ for hit in ctx.retrieve("分布式数据库", scope="acme/db/engineer", k=10):
 ## 工作原理
 
 - **统一对象模型** — 记忆、知识、轨迹、技能全部是 `ContextItem`。每条条目携带强制 `Provenance`（来源类型、来源 id、置信度）和有类型的 `Link` 边（支持、反驳、衍生、替代），支持构建完整的 `EvidenceChain` DAG 及置信度传播。
-- **内容分层** — L0（约 100 token）用于 Embedding 召回；L1（约 2k token）是 `retrieve()` 的默认返回面；L2（完整正文）通过 `expand()` 按需升档。
+- **内容分层** — L0（完整正文）通过 `expand()` 按需升档；L1（约 2k token）是 `retrieve()` 的默认返回面；L2（约 100 token）用于 Embedding 召回。
 - **检索编排器** — 关键词 + 向量混合召回，可选 LLM 重排序，基于 scope 路由。返回排名 `SearchHit` 行，通过 `ctx.tools()` 向 OpenAI 或 Anthropic Agent 暴露工具描述。
 - **EvolutionEngine** — 监测可合并、可消解冲突、可推进阶段或可提炼为技能的条目，在写入后增量运行，也可通过 `compact()` 显式触发。
 - **DreamEngine** — 闲时进行模式整合与跨簇假设生成，通过 `dream()` 触发。

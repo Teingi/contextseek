@@ -8,9 +8,9 @@ from enum import Enum
 class ContentLevel(str, Enum):
     """Three semantic storage tiers.
 
-    - L0 (abstract): ~100-token gist powering ANN semantic retrieval.
+    - L0 (full):     full source text; fetch on demand via ``expand()``.
     - L1 (overview): ~2k-token overview; default surface for agents.
-    - L2 (full):     full source text; fetch on demand via ``expand()``.
+    - L2 (abstract): ~100-token gist powering ANN semantic retrieval.
     """
 
     L0 = "l0"

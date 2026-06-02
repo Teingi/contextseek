@@ -351,7 +351,7 @@ class ContextSeekMiddleware(
             if not ai_text:
                 return None
             # Store the Q+A pair so the Summarizer inside ctx.add() has full
-            # context to produce a tight abstract (L0) and overview (L1).
+            # context to produce a tight abstract (L2) and overview (L1).
             # Distillation is the Summarizer's job, not the middleware's.
             self._traced_add(
                 content=f"Q: {last_user}\nA: {ai_text}",

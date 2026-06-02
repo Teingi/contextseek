@@ -20,7 +20,7 @@ class SearchHit:
     """Combined relevance score."""
 
     layer: Literal["summary", "full"]
-    """Content tier exposed for this hit. ``"summary"`` means L1 only; ``"full"`` means L2 body is present."""
+    """Content tier exposed for this hit. ``"summary"`` means L1 only; ``"full"`` means L0 body is present."""
 
     provenance_summary: str
     """One-line provenance blurb (e.g. distilled from three deploy traces)."""

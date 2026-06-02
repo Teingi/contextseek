@@ -10,24 +10,24 @@ ContextSeek 的检索是多阶段流水线：**召回** → **重排** → **分
 
 | 层级 | 字段 | 大小 | 作用 |
 |------|------|------|------|
-| **L0** | `abstract` | 约 100 字 | 向量索引输入 |
+| **L0** | `content` | 完整正文 | `full=True` 或 `expand()` 按需获取 |
 | **L1** | `summary` | 约 2k 字 | `retrieve()` 默认返回 |
-| **L2** | `content` | 完整正文 | `full=True` 或 `expand()` 按需获取 |
+| **L2** | `abstract` | 约 100 字 | 向量索引输入 |
 
-**L0 和 L1 在 `add()` 时由 Summarizer 自动生成：**
+**L2 和 L1 在 `add()` 时由 Summarizer 自动生成：**
 
 ```
 add(content)
      │
      ▼
-Summarizer ──── abstract (L0) ──▶ Embedder ──▶ 向量索引
+Summarizer ──── abstract (L2) ──▶ Embedder ──▶ 向量索引
             └── summary  (L1) ──▶ 随条目存储
 
 retrieve() ──▶ 默认返回 L1
-expand()   ──▶ 将选中命中升档为 L2
+expand()   ──▶ 将选中命中升档为 L0
 ```
 
-未配置 Summarizer 时，L0 和 L1 字段为空，`retrieve()` 直接返回 L2 正文，并发出一次性警告。这是有意为之：零配置开发/测试无需 API Key；生产环境建议启用 `SUMMARIZER_PROVIDER=llm`。
+未配置 Summarizer 时，L2 和 L1 字段为空，`retrieve()` 直接返回 L0 正文，并发出一次性警告。这是有意为之：零配置开发/测试无需 API Key；生产环境建议启用 `SUMMARIZER_PROVIDER=llm`。
 
 ---
 
@@ -37,9 +37,9 @@ expand()   ──▶ 将选中命中升档为 L2
 
 | 路由 | 工作方式 | 适合场景 |
 |------|----------|----------|
-| `phrase` | L0 或 L2 上的精确/近似子串匹配 | 短而精确的查询 |
+| `phrase` | L2 或 L0 上的精确/近似子串匹配 | 短而精确的查询 |
 | `terms` | 对分词内容的倒排索引 | 关键词密集型查询 |
-| `vector` | L0 向量的近似最近邻 | 语义相似性 |
+| `vector` | L2 向量的近似最近邻 | 语义相似性 |
 
 默认为 `["phrase", "terms"]`（无需向量模型）。配置了 Embedding 后加入 `vector`：
 
@@ -92,14 +92,14 @@ for hit in response:
     print(hit.item.summary)     # L1 — 约 2k 字/条
     print(hit.layer)            # "summary"
 
-# 将选中命中升档为 L2
+# 将选中命中升档为 L0
 interesting = [h for h in response if h.score > 0.7]
 full_items = ctx.expand(interesting)
 
-# 直接返回 L2（更多 token，省去 expand 往返）
+# 直接返回 L0（更多 token，省去 expand 往返）
 response = ctx.retrieve("query", scope="acme/bot", k=5, full=True)
 for hit in response:
-    print(hit.item.content)     # L2 — 完整正文
+    print(hit.item.content)     # L0 — 完整正文
 ```
 
 **推荐的 Agent 模式：**
@@ -170,7 +170,7 @@ retrieve(query, scope, k)
   ┌──────────────────────────────────────┐
   │ 分层输出                               │
   │  full=False → 替换 content → L1 摘要  │
-  │  full=True  → 保留 content → L2 正文  │
+  │  full=True  → 保留 content → L0 正文  │
   └──────────────────────────────────────┘
 ```
 

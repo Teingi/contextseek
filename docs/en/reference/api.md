@@ -62,13 +62,13 @@ On `add()`, ContextSeek:
 1. Builds `Provenance` from `source` and `source_type`
 2. Infers `stage` and `stability` (or uses overrides)
 3. Detects exact duplicates (raises `ValueError`) and near-conflicts (tags item)
-4. Generates L0 `abstract` and L1 `summary` if a `Summarizer` is configured
-5. Computes embedding of L0 (or L2 fallback) if an `Embedder` is configured
+4. Generates L2 `abstract` and L1 `summary` if a `Summarizer` is configured
+5. Computes embedding of L2 (or L0 fallback) if an `Embedder` is configured
 6. Persists and emits an audit record
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `content` | required | Text or JSON-serializable dict payload (L2 body) |
+| `content` | required | Text or JSON-serializable dict payload (L0 body) |
 | `scope` | required | Tenant/project/subject path, e.g. `"acme/bot/user_42"` |
 | `source` | required | Source identifier: URL, user ID, trace ID, etc. |
 | `source_type` | `SourceType.human_input` | How data entered the system — affects stage inference |
@@ -119,14 +119,14 @@ See [DataPlugs](../guides/integrations/dataplugs.md) for available plug types.
 
 Ranked semantic search. Returns a `RetrieveResponse` iterable of `SearchHit` objects.
 
-By default returns **L1 summaries** (token-efficient). Pass `full=True` to receive L2 bodies directly. To upgrade selected hits lazily, call `expand()`.
+By default returns **L1 summaries** (token-efficient). Pass `full=True` to receive L0 bodies directly. To upgrade selected hits lazily, call `expand()`.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `query` | required | Natural-language query string |
 | `scope` | required | Scope prefix — searches this prefix and all sub-scopes |
 | `k` | `10` | Maximum hits to return |
-| `full` | `False` | `True` → L2 bodies; `False` → L1 summaries (call `expand()` for L2) |
+| `full` | `False` | `True` → L0 bodies; `False` → L1 summaries (call `expand()` for L0) |
 | `stage` | `None` | Filter by `Stage` enum value |
 | `tags` | `None` | All listed tags must match (AND filter) |
 | `filters` | `None` | Dict bag: may include `stage`, `tags`, `min_confidence` |
@@ -146,7 +146,7 @@ for hit in response:
 
 ### `expand(hits) → list[ContextItem]`
 
-Upgrade a list of `SearchHit` rows to L2 full text. Scope is derived from `hit.item.scope` — no extra argument required.
+Upgrade a list of `SearchHit` rows to L0 full text. Scope is derived from `hit.item.scope` — no extra argument required.
 
 ```python
 response = ctx.retrieve("query", scope="acme/bot")

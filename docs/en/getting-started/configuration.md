@@ -105,7 +105,7 @@ SUMMARIZER_PROVIDER=llm
 
 Install: `pip install "contextseek[langchain,openai]"`.
 
-Enables L0/L1 generation on `add()`, vector recall, optional LLM rerank.
+Enables L2/L1 generation on `add()`, vector recall, optional LLM rerank.
 
 ### Profile D — Production checklist
 
@@ -161,15 +161,15 @@ Used for rerank, summarizer, evolution, dream, conflict judge — any feature th
 
 ### Summarizer (`SUMMARIZER_*`)
 
-Drives L0 `abstract` and L1 `summary` on every `add()`.
+Drives L2 `abstract` and L1 `summary` on every `add()`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SUMMARIZER_PROVIDER` | `llm` | `none` disables; `llm` uses `LLM_*` |
-| `SUMMARIZER_L0_MAX_CHARS` | `100` | L0 char budget |
+| `SUMMARIZER_L2_MAX_CHARS` | `100` | L2 char budget |
 | `SUMMARIZER_L1_MAX_CHARS` | `2000` | L1 char budget |
 
-If `SUMMARIZER_PROVIDER=llm` but no LLM is configured, summarizer is skipped and retrieval falls back to L2-only behavior (with a one-time warning).
+If `SUMMARIZER_PROVIDER=llm` but no LLM is configured, summarizer is skipped and retrieval falls back to L0-only behavior (with a one-time warning).
 
 ### Retrieval (`RETRIEVAL_*`)
 

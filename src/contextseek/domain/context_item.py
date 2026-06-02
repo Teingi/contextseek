@@ -59,7 +59,7 @@ class ContextItem:
     # Pillar 1: Retrievable
     # ═══════════════════════════════════════════
     abstract: str | None = None
-    """L0 short abstract (~100 tokens); source text for embeddings; None if not generated yet."""
+    """L2 short abstract (~100 tokens); source text for embeddings; None if not generated yet."""
 
     summary: str | None = None
     """L1 overview (~2k tokens); default surface returned to agents; inject summary instead of full text under tight budgets."""
@@ -68,7 +68,7 @@ class ContextItem:
     """Searchable tags."""
 
     embedding: list[float] | None = None
-    """Vector of abstract (L0); falls back to embedding ``content`` when abstract is None."""
+    """Vector of abstract (L2); falls back to embedding ``content`` when abstract is None."""
 
     searchable: bool = True
     """Whether this item participates in search (set False after archival)."""

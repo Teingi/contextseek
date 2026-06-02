@@ -101,7 +101,7 @@ SUMMARIZER_PROVIDER=llm
 
 安装：`pip install "contextseek[langchain,openai]"`。
 
-`add()` 会生成 L0/L1，检索可走向量；可选 LLM 重排。
+`add()` 会生成 L2/L1，检索可走向量；可选 LLM 重排。
 
 ### 档 D — 生产补充项
 
@@ -155,15 +155,15 @@ OceanBase 另见 `OB_*` 与 [存储后端](../guides/storage.md)。
 
 ### Summarizer（`SUMMARIZER_*`）
 
-每次 `add()` 生成 L0/L1。
+每次 `add()` 生成 L2/L1。
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
 | `SUMMARIZER_PROVIDER` | `llm` | `none` 关闭；`llm` 用 `LLM_*` |
-| `SUMMARIZER_L0_MAX_CHARS` | `100` | L0 字符上限 |
+| `SUMMARIZER_L2_MAX_CHARS` | `100` | L2 字符上限 |
 | `SUMMARIZER_L1_MAX_CHARS` | `2000` | L1 字符上限 |
 
-`SUMMARIZER_PROVIDER=llm` 但未配 LLM 时，summarizer 跳过，检索退化为 L2（一次性警告）。
+`SUMMARIZER_PROVIDER=llm` 但未配 LLM 时，summarizer 跳过，检索退化为 L0（一次性警告）。
 
 ### 检索（`RETRIEVAL_*`）
 

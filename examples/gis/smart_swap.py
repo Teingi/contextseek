@@ -15,7 +15,7 @@
 
 前提：建议先运行 gis_memory.py 写入位置记忆，否则场景1/2/4降级为常规推荐。
       STORAGE_BACKEND=oceanbase，GEO_ENABLED=true
-      LLM_PROVIDER=langchain（换电站 L0 摘要生成 + LLM 重排推荐排序）
+      LLM_PROVIDER=langchain（换电站 L2 摘要生成 + LLM 重排推荐排序）
       EMBEDDING_PROVIDER=langchain（向量化摘要，支持自然语言意图查询）
 """
 
@@ -169,7 +169,7 @@ for s in swap_stations:
     wait  = f"等待{s['est_wait_min']}min" if s["est_wait_min"] else "即到即换"
     print(f"  {s['name'][:20]:20s} {gen_label:10s} 电池{avail:5s} {wait}")
     if station_item and station_item.abstract:
-        print(f"    ↳ L0: {station_item.abstract}")
+        print(f"    ↳ L2: {station_item.abstract}")
 
 
 # ── 推荐辅助函数 ──────────────────────────────────────────────────────────────
