@@ -55,7 +55,7 @@ Configure via `.env` (see [.env.example](.env.example)) or `ContextSeekSettings`
 ## How it works
 
 - **Unified object model** — all context — memory, knowledge, traces, skills — is a `ContextItem`. Items carry mandatory `Provenance` (source type, source id, confidence) and typed `Link` edges (supports, refutes, derives, supersedes), enabling a full `EvidenceChain` DAG with confidence propagation.
-- **Content tiers** — L0 (~100 tokens) feeds embedding recall. L1 (~2 k tokens) is the default surface returned by `retrieve()`. L2 (full body) is available on demand via `expand()`.
+- **Content tiers** — L0 (full body) is available on demand via `expand()`. L1 (~2 k tokens) is the default surface returned by `retrieve()`. L2 (~100 tokens) feeds embedding recall.
 - **Retrieval orchestrator** — keyword + vector hybrid recall, optional LLM reranking, and scope-based routing. Returns ranked `SearchHit` rows. Exposes tool specs for OpenAI and Anthropic agents via `ctx.tools()`.
 - **EvolutionEngine** — watches for items that can be merged, resolved, advanced in stage, or distilled into skills. Runs incrementally after writes or on an explicit `compact()` call.
 - **DreamEngine** — idle-time pattern consolidation and cross-cluster hypothesis generation, triggered via `dream()`.

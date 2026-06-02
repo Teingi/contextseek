@@ -91,12 +91,12 @@ print(len(list(response)))
 
 - 启用 LLM 重排：`RETRIEVAL_RERANKER_MODE=llm`
 - 召回路由加入 `vector`（需配置 Embedding）
-- 检查条目是否有 L0 `abstract` 字段：运行 `ctx.items()` 并查看 `item.abstract`
+- 检查条目是否有 L2 `abstract` 字段：运行 `ctx.items()` 并查看 `item.abstract`
 - 尝试更宽泛的 `scope` 前缀，覆盖更多条目
 
-### `retrieve()` 返回 L2 正文而非摘要（并伴有警告）
+### `retrieve()` 返回 L0 正文而非摘要（并伴有警告）
 
-Summarizer 未配置。L1 字段为空，ContextSeek 回退为 L2 模式。开启方式：
+Summarizer 未配置。L1 字段为空，ContextSeek 回退为 L0 模式。开启方式：
 
 ```env
 SUMMARIZER_PROVIDER=llm

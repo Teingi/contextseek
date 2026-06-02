@@ -1,7 +1,7 @@
 """GIS 地图 POI 搜索示例 — OceanBase 后端。
 
 演示内容：
-1. 批量写入 POI，LLM 自动生成 L0 摘要（Summarizer）
+1. 批量写入 POI，LLM 自动生成 L2 摘要（Summarizer）
 2. 混合搜索：phrase + terms + vector + geo 四路召回 + LLM 重排
 3. 利用 geo_decay_score 对远距离 POI 降权
 4. 向量语义搜索对比：关键词 vs 自然语言查询效果差异
@@ -75,7 +75,7 @@ for p in pois:
     )
     print(f"  写入 POI: {p['name']} ({p['category']}) @ ({p['lat']}, {p['lon']})")
     if item.abstract:
-        print(f"    ↳ L0: {item.abstract}")
+        print(f"    ↳ L2: {item.abstract}")
 
 # =============================================================================
 # 2. 混合搜索：用户在西单附近搜索"烤鸭"

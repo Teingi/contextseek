@@ -111,7 +111,7 @@ def build_summarizer(
 
     Returns:
         ``None`` when ``provider == "none"`` or when ``provider == "llm"``
-        but no usable LLM is configured (graceful fallback to flat L2-only).
+        but no usable LLM is configured (graceful fallback to flat L0-only).
         :class:`~contextseek.bridges.summarizer.LLMSummarizer` when
         ``provider == "llm"`` and an LLM is available (uses ``llm`` if
         provided, otherwise builds one from the global ``LLM_*`` env vars).
@@ -127,7 +127,7 @@ def build_summarizer(
             effective_llm = llm if llm is not None else build_llm(LLMSettings())
         except Exception as exc:
             warnings.warn(
-                f"build_summarizer: LLM init failed ({exc}); falling back to L2-only.",
+                f"build_summarizer: LLM init failed ({exc}); falling back to L0-only.",
                 RuntimeWarning,
                 stacklevel=2,
             )
@@ -136,7 +136,7 @@ def build_summarizer(
             return None
         return LLMSummarizer(
             effective_llm,
-            l0_max_chars=settings.l0_max_chars,
+            l2_max_chars=settings.l2_max_chars,
             l1_max_chars=settings.l1_max_chars,
             prompts=prompt_templates,
         )

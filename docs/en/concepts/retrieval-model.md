@@ -10,24 +10,24 @@ Every `ContextItem` holds content at up to three levels of granularity:
 
 | Tier | Field | Size | Role |
 |------|-------|------|------|
-| **L0** | `abstract` | ~100 chars | Embedding input — feeds the vector index |
+| **L0** | `content` | Full body | On-demand via `full=True` or `expand()` |
 | **L1** | `summary` | ~2k chars | Default surface returned by `retrieve()` |
-| **L2** | `content` | Full body | On-demand via `full=True` or `expand()` |
+| **L2** | `abstract` | ~100 chars | Embedding input — feeds the vector index |
 
-**L0 and L1 are generated automatically** on `add()` when a `Summarizer` is configured:
+**L2 and L1 are generated automatically** on `add()` when a `Summarizer` is configured:
 
 ```
 add(content)
      │
      ▼
-Summarizer ──── abstract (L0) ──▶ Embedder ──▶ index
+Summarizer ──── abstract (L2) ──▶ Embedder ──▶ index
             └── summary  (L1) ──▶ stored alongside item
 
 retrieve() ──▶ returns L1 by default
-expand()   ──▶ upgrades selected hits to L2
+expand()   ──▶ upgrades selected hits to L0
 ```
 
-Without a summarizer, L0 and L1 fields are empty, `retrieve()` returns L2 bodies directly, and a one-time warning is emitted. This is intentional: zero-config dev/test works without API keys; production should enable `SUMMARIZER_PROVIDER=llm`.
+Without a summarizer, L2 and L1 fields are empty, `retrieve()` returns L0 bodies directly, and a one-time warning is emitted. This is intentional: zero-config dev/test works without API keys; production should enable `SUMMARIZER_PROVIDER=llm`.
 
 ---
 
@@ -37,9 +37,9 @@ Recall is the first stage: collect candidate items before scoring. Three routes 
 
 | Route | How it works | Best for |
 |-------|-------------|----------|
-| `phrase` | Exact/near-exact substring match on L0 or L2 | Short, precise queries |
+| `phrase` | Exact/near-exact substring match on L2 or L0 | Short, precise queries |
 | `terms` | Inverted index on tokenized content | Keyword-heavy queries |
-| `vector` | Approximate nearest-neighbor on L0 embeddings | Semantic similarity |
+| `vector` | Approximate nearest-neighbor on L2 embeddings | Semantic similarity |
 
 The default is `["phrase", "terms"]` (no embedding required). Add `vector` when you have an embedding model configured:
 
@@ -92,14 +92,14 @@ for hit in response:
     print(hit.item.summary)     # L1 — ~2k chars per item
     print(hit.layer)            # "summary"
 
-# Upgrade selected hits to L2
+# Upgrade selected hits to L0
 interesting = [h for h in response if h.score > 0.7]
 full_items = ctx.expand(interesting)
 
-# Full L2 directly (more tokens, skips expand round-trip)
+# Full L0 directly (more tokens, skips expand round-trip)
 response = ctx.retrieve("query", scope="acme/bot", k=5, full=True)
 for hit in response:
-    print(hit.item.content)     # L2 — full body
+    print(hit.item.content)     # L0 — full body
 ```
 
 **Recommended pattern for agents:**
@@ -170,7 +170,7 @@ retrieve(query, scope, k)
   ┌──────────────────────────────────────┐
   │ Layer shape                          │
   │  full=False → swap content → L1 sum  │
-  │  full=True  → keep content → L2 body │
+  │  full=True  → keep content → L0 body │
   └──────────────────────────────────────┘
 ```
 

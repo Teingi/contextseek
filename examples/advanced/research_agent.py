@@ -6,7 +6,7 @@ skills.
 
 This script exercises all major ContextSeek capabilities:
   - ContextItem add with provenance (multiple source types)
-  - retrieve() with full=False (L1 default) vs full=True (L2)
+  - retrieve() with full=False (L1 default) vs full=True (L0)
   - expand() to upgrade selected hits to full content
   - Links between items (supports/refutes/supersedes)
   - Evolution pipeline (raw → extracted → knowledge → skill)
@@ -161,7 +161,7 @@ def main() -> None:
         print(f"  Superseding: {superseding_item.id} → supersedes original CAP item")
 
         # ──────────────────────────────────────────────────────────────────
-        # Step 4: retrieve (default L1 summaries) vs full=True (L2) + expand
+        # Step 4: retrieve (default L1 summaries) vs full=True (L0) + expand
         # ──────────────────────────────────────────────────────────────────
         print("\n[Step 4] Retrieving context (summary mode vs full mode)...")
 
@@ -173,14 +173,14 @@ def main() -> None:
             preview = (hit.item.summary or hit.item.content_text)[:70]
             print(f"      [{i}] score={hit.score:.4f} stage={hit.item.stage.value} layer={hit.layer} | {preview}")
 
-        print(f"\n  4b) full=True (L2 content): query={query!r}")
+        print(f"\n  4b) full=True (L0 content): query={query!r}")
         response_full = ctx.retrieve(query, scope=scope, k=5, full=True)
         for i, hit in enumerate(list(response_full)[:3], 1):
             print(f"      [{i}] [{hit.item.stage.value}] {hit.item.content_text[:60]}...")
 
-        print("\n  4c) expand: upgrade two summary hits to full L2")
+        print("\n  4c) expand: upgrade two summary hits to full L0")
         upgraded = ctx.expand(list(response)[:2])
-        print(f"      Upgraded {len(upgraded)} items to full L2 content")
+        print(f"      Upgraded {len(upgraded)} items to full L0 content")
 
         # ──────────────────────────────────────────────────────────────────
         # Step 5: Write Trace (for training data export)

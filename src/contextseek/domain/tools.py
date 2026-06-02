@@ -60,7 +60,7 @@ _RETRIEVE_SPEC = ToolSpec(
     name="retrieve",
     description=(
         "Search the ContextSeek store and return ranked hits as summaries (L1). "
-        "Pass full=true to receive full content (L2) directly instead of summaries."
+        "Pass full=true to receive full content (L0) directly instead of summaries."
     ),
     parameters={
         "type": "object",
@@ -74,7 +74,7 @@ _RETRIEVE_SPEC = ToolSpec(
             },
             "full": {
                 "type": "boolean",
-                "description": "If true, return L2 full content instead of L1 summaries.",
+                "description": "If true, return L0 full content instead of L1 summaries.",
                 "default": False,
             },
         },
@@ -92,7 +92,7 @@ _EXPAND_SPEC = ToolSpec(
             "ids": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "List of item ids to expand to L2 full content.",
+                "description": "List of item ids to expand to L0 full content.",
             },
             "scope": {
                 "type": "string",

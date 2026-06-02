@@ -62,13 +62,13 @@ ctx = ContextSeek.from_runtime_config("contextseek.runtime.json")
 1. 根据 `source` 和 `source_type` 构建 `Provenance`
 2. 推断 `stage` 和 `stability`（或使用覆盖值）
 3. 精确重复检测（抛出 `ValueError`）与近似冲突检测（给条目打标签）
-4. 若配置了 `Summarizer`，生成 L0 `abstract` 和 L1 `summary`
-5. 若配置了 `Embedder`，对 L0（或 L2 兜底）计算向量
+4. 若配置了 `Summarizer`，生成 L2 `abstract` 和 L1 `summary`
+5. 若配置了 `Embedder`，对 L2（或 L0 兜底）计算向量
 6. 持久化并发出审计记录
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `content` | 必填 | 文本或可序列化 dict（L2 正文） |
+| `content` | 必填 | 文本或可序列化 dict（L0 正文） |
 | `scope` | 必填 | 租户/项目/主题路径，如 `"acme/bot/user_42"` |
 | `source` | 必填 | 来源标识：URL、用户 ID、Trace ID 等 |
 | `source_type` | `SourceType.human_input` | 数据入口类型，影响 stage 推断 |
@@ -118,14 +118,14 @@ ctx.plug(RAGPlug(results=my_rag_results), scope="acme/kb/general")
 
 排名语义检索，返回 `SearchHit` 的可迭代 `RetrieveResponse`。
 
-默认返回 **L1 摘要**（省 token）。传入 `full=True` 直接获取 L2 正文；或先召回后选择性调用 `expand()` 升档。
+默认返回 **L1 摘要**（省 token）。传入 `full=True` 直接获取 L0 正文；或先召回后选择性调用 `expand()` 升档。
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `query` | 必填 | 自然语言查询 |
 | `scope` | 必填 | Scope 前缀，检索该前缀及所有子 scope |
 | `k` | `10` | 最多返回命中数 |
-| `full` | `False` | `True` 返回 L2 正文；`False` 返回 L1 摘要 |
+| `full` | `False` | `True` 返回 L0 正文；`False` 返回 L1 摘要 |
 | `stage` | `None` | 按 Stage 枚举值过滤 |
 | `tags` | `None` | AND 过滤：所有标签必须全部匹配 |
 | `filters` | `None` | 字典包：可含 `stage`、`tags`、`min_confidence` |
@@ -145,7 +145,7 @@ for hit in response:
 
 ### `expand(hits) → list[ContextItem]`
 
-将 `SearchHit` 列表升档为 L2 完整正文。Scope 由 `hit.item.scope` 自动推断，无需额外参数。
+将 `SearchHit` 列表升档为 L0 完整正文。Scope 由 `hit.item.scope` 自动推断，无需额外参数。
 
 ```python
 response = ctx.retrieve("query", scope="acme/bot")

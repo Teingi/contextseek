@@ -36,7 +36,7 @@ class ContextSeekMCPServer:
                 "name": "contextseek_retrieve",
                 "description": (
                     "Retrieve from ContextSeek: returns ranked SearchHits with L1 "
-                    "summaries by default. Pass full=true for L2 complete content."
+                    "summaries by default. Pass full=true for L0 complete content."
                 ),
                 "parameters": {
                     "scope": {"type": "string", "required": True},
@@ -47,7 +47,7 @@ class ContextSeekMCPServer:
             },
             {
                 "name": "contextseek_expand",
-                "description": "Upgrade SearchHits (by item id) to L2 full content",
+                "description": "Upgrade SearchHits (by item id) to L0 full content",
                 "parameters": {
                     "scope": {"type": "string", "required": True},
                     "ids": {

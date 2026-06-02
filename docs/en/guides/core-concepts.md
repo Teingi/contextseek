@@ -60,16 +60,16 @@ item = ctx.add(
 |-------|-------------|
 | `id` | Auto-generated hex id unless you manage ids yourself via low-level APIs |
 | `scope` | Tenant/project/subject path (see below) |
-| `content` | L2 payload: string or JSON-serializable dict |
+| `content` | L0 payload: string or JSON-serializable dict |
 
 **Retrievable surface**
 
 | Field | Description |
 |-------|-------------|
-| `abstract` | L0 (~100 chars) — embedding input when summarizer runs |
+| `abstract` | L2 (~100 chars) — embedding input when summarizer runs |
 | `summary` | L1 (~2k chars) — default text in `retrieve()` hits |
 | `tags` | Filter dimensions; **all** listed tags must match when filtering |
-| `embedding` | Vector of L0 (or L2 fallback) |
+| `embedding` | Vector of L2 (or L0 fallback) |
 | `searchable` | `False` after archive/soft-delete |
 | `relevance_boost` | Multiplier from positive `feedback()` |
 
@@ -169,17 +169,17 @@ Default stability per stage is defined in code (`STAGE_DEFAULT_STABILITY`).
 
 | Tier | Field | Agent sees by default? | Generated when |
 |------|-------|------------------------|----------------|
-| L0 | `abstract` | No (internal) | Summarizer on `add()` |
+| L0 | `content` | After `full=True` or `expand()` | Your `add()` payload |
 | L1 | `summary` | Yes (`retrieve`, `layer=summary`) | Summarizer on `add()` |
-| L2 | `content` | After `full=True` or `expand()` | Your `add()` payload |
+| L2 | `abstract` | No (internal) | Summarizer on `add()` |
 
 ```mermaid
 flowchart LR
-  add[add L2 content]
+  add[add L0 content]
   sum[Summarizer]
-  emb[Embedder on L0]
+  emb[Embedder on L2]
   ret[retrieve L1]
-  exp[expand L2]
+  exp[expand L0]
 
   add --> sum
   sum --> emb
@@ -190,7 +190,7 @@ flowchart LR
 Without summarizer:
 
 - L1 fields stay empty.
-- `retrieve()` returns L2 in hits (`layer=full`).
+- `retrieve()` returns L0 in hits (`layer=full`).
 - A one-time warning suggests enabling `SUMMARIZER_PROVIDER=llm`.
 
 This is intentional: dev/test works without API keys; production should enable summarizer for cost control.
@@ -272,7 +272,7 @@ Express intent with **`source_type`**, **`tags`**, and **`stage`**, not with dif
  Application                ContextSeek client
  ┌─────────────┐            ┌──────────────────────────┐
  │ Agent loop  │──add()────▶│ ContextItem + storage    │
- │             │◀─retrieve─│ Recall → rerank → L1/L2  │
+ │             │◀─retrieve─│ Recall → rerank → L1/L0  │
  └─────────────┘            └───────────┬──────────────┘
                                         │
                          seekvfs adapters (memory/file/OceanBase/…)
