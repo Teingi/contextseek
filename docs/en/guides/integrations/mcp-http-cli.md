@@ -30,7 +30,7 @@ Assumes `.env` in cwd or repo root (see [Configuration](../../getting-started/co
 |---------|-------------|
 | `add` | Write one item |
 | `retrieve` | Ranked search (`--k`, optional `--full`) |
-| `expand` | Load L2 by comma-separated `--ids` |
+| `expand` | Load L0 by comma-separated `--ids` |
 | `compact` | Run evolution (`--dry-run`) |
 | `forget` | Soft-delete (`--item-id`, `--reason`) |
 | `delete` | Hard delete (`--no-propagate` optional) |
@@ -63,7 +63,7 @@ contextseek retrieve \
   --query "language preference" \
   --k 5
 
-# Full L2 in one shot
+# Full L0 in one shot
 contextseek retrieve \
   --scope acme/proj/user \
   --query "language preference" \

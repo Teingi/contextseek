@@ -208,12 +208,12 @@ class SeekVFSStorageAdapter(
         if payload is None:
             return None
         if level == ContentLevel.L0:
-            return payload.get("abstract")
+            content = payload.get("content")
+            return str(content) if content is not None else None
         if level == ContentLevel.L1:
             return payload.get("summary")
         # L2
-        content = payload.get("content")
-        return str(content) if content is not None else None
+        return payload.get("abstract")
 
     def read_batch_with_level(
         self,

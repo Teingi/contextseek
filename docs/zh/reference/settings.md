@@ -56,15 +56,15 @@ Provider 的 API Key（`OPENAI_API_KEY`、`DASHSCOPE_API_KEY` 等）由 LangChai
 
 ## 摘要生成（`SUMMARIZER_*`）
 
-控制每次 `add()` 时 L0 `abstract` 和 L1 `summary` 的生成。
+控制每次 `add()` 时 L2 `abstract` 和 L1 `summary` 的生成。
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `SUMMARIZER_PROVIDER` | `llm` | `none`（禁用）或 `llm`（使用 `LLM_*`） |
-| `SUMMARIZER_L0_MAX_CHARS` | `100` | L0 abstract 字符预算 |
+| `SUMMARIZER_L2_MAX_CHARS` | `100` | L2 abstract 字符预算 |
 | `SUMMARIZER_L1_MAX_CHARS` | `2000` | L1 summary 字符预算 |
 
-`SUMMARIZER_PROVIDER=llm` 但未配置 LLM 时，摘要生成被跳过，发出一次警告，检索退化为仅 L2 模式。
+`SUMMARIZER_PROVIDER=llm` 但未配置 LLM 时，摘要生成被跳过，发出一次警告，检索退化为仅 L0 模式。
 
 ## 检索（`RETRIEVAL_*`）
 
@@ -118,7 +118,7 @@ Provider 的 API Key（`OPENAI_API_KEY`、`DASHSCOPE_API_KEY` 等）由 LangChai
 
 | 变量 | 模板用途 |
 |------|----------|
-| `PROMPT_SUMMARIZER_ABSTRACT_TEMPLATE` | L0 abstract 生成 |
+| `PROMPT_SUMMARIZER_ABSTRACT_TEMPLATE` | L2 abstract 生成 |
 | `PROMPT_SUMMARIZER_SUMMARY_TEMPLATE` | L1 summary 生成 |
 | `PROMPT_RETRIEVAL_RELEVANCE_TEMPLATE` | LLM 重排评分 |
 | `PROMPT_CONFLICT_JUDGE_TEMPLATE` | 写入时矛盾检测 |

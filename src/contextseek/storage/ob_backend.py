@@ -380,7 +380,7 @@ class OceanBaseBackend(BackendProtocol):
         """Fail fast if the existing table's VECTOR column dimension differs from ours.
 
         Checks ``abstract_embedding`` first (new schema); falls back to ``embedding``
-        for backward compatibility with tables created before the L0/L1/L2 split.
+        for backward compatibility with tables created before the L0/L1/L2 tier split.
         """
         assert self._obvector is not None
         try:
@@ -423,7 +423,7 @@ class OceanBaseBackend(BackendProtocol):
             else str(raw_content or "")
         )
         abstract_emb = payload.get("embedding")
-        # FTS surface: prefer abstract+summary (L0/L1 granularity); fall back to
+        # FTS surface: prefer abstract+summary (L2/L1 granularity); fall back to
         # full text when both are empty for backward compatibility.
         fulltext_content = (f"{abstract} {summary}").strip() or text_content
 

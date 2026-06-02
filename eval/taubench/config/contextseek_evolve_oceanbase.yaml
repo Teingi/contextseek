@@ -58,7 +58,7 @@ contextseek:
       temperature: 0.0
   summarizer:
     provider: llm
-    l0_max_chars: 800
+    l2_max_chars: 800
     l1_max_chars: 2000
   retrieval:
     default_k: 20

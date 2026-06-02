@@ -91,12 +91,12 @@ print(len(list(response)))
 
 - Enable LLM reranking: `RETRIEVAL_RERANKER_MODE=llm`
 - Add `vector` to recall routes (requires embedding config)
-- Check that items have L0 `abstract` fields — run `ctx.items()` and inspect `item.abstract`
+- Check that items have L2 `abstract` fields — run `ctx.items()` and inspect `item.abstract`
 - Try a broader `scope` prefix that includes more items
 
-### `retrieve()` returns L2 bodies instead of summaries (with a warning)
+### `retrieve()` returns L0 bodies instead of summaries (with a warning)
 
-The summarizer is not configured. L1 summaries are empty so ContextSeek falls back to L2. To enable:
+The summarizer is not configured. L1 summaries are empty so ContextSeek falls back to L0. To enable:
 
 ```env
 SUMMARIZER_PROVIDER=llm

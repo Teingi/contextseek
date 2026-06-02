@@ -52,7 +52,7 @@ class VectorMemoryAdapter(HashIndexMixin, VectorSearchMixin):
 
     def write(self, ref: str, payload: dict[str, Any]) -> None:
         self._store[ref] = dict(payload)
-        # Prefer API-precomputed vectors (from L0 abstract), matching the OB backend;
+        # Prefer API-precomputed vectors (from L2 abstract), matching the OB backend;
         # fall back to this adapter's embedder when missing (tests / standalone use).
         pre_computed = payload.get("embedding")
         if pre_computed is not None:

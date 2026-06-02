@@ -8,7 +8,7 @@
 |------|------|--------|----------|
 | 写入 | `add()` | `ContextItem` | 用户输入、文档、Trace、工具结果 |
 | 排名读取 | `retrieve()` | `RetrieveResponse` | 注入下一轮 Prompt |
-| 升档 L2 | `expand()` | `list[ContextItem]` | 为选中命中加载全文 |
+| 升档 L0 | `expand()` | `list[ContextItem]` | 为选中命中加载全文 |
 | 按 id 升档 | `expand_by_ids()` | `list[ContextItem]` | HTTP/MCP 无 `SearchHit` 时 |
 | 枚举 | `items()` | `list[ContextItem]` | 运维、演进、调试（无相关性排序） |
 | Agent 工具 | `tools()` | `list[ToolSpec]` | OpenAI / Anthropic 函数定义 |
@@ -20,7 +20,7 @@ sequenceDiagram
   participant Store as 存储
 
   App->>SC: add(content, scope, source)
-  SC->>SC: provenance、L0/L1、向量、冲突检测
+  SC->>SC: provenance、L2/L1、向量、冲突检测
   SC->>Store: write(ref, payload)
   SC-->>App: ContextItem
 
@@ -30,7 +30,7 @@ sequenceDiagram
   SC-->>App: RetrieveResponse
 
   App->>SC: expand(选中 hits)
-  SC->>Store: 按 id 读取 L2
+  SC->>Store: 按 id 读取 L0
   SC-->>App: list[ContextItem]
 ```
 
@@ -95,8 +95,8 @@ trace = ctx.add(
 2. **Provenance** — 由 `source` + `source_type` 构建
 3. **Stage / stability** — 启发式或（开启时）LLM 分类
 4. **冲突检测** — 完全重复抛 `ValueError`；近似重复打 `near_duplicate`；矛盾打 `has_contradiction` 并建 `refuted_by` 链接
-5. **Summarizer** — 配置正确时生成 L0 `abstract`、L1 `summary`
-6. **Embedder** — 对 L0（无则 L2 全文）做向量
+5. **Summarizer** — 配置正确时生成 L2 `abstract`、L1 `summary`
+6. **Embedder** — 对 L2（无则 L0 全文）做向量
 7. **持久化** — 写入 `contextseek://{scope}/{id}`
 
 无 summarizer/embedder 时，仍可通过 File 等后端的 **phrase/term** 子串召回检索。
@@ -142,7 +142,7 @@ for hit in response:
 | `query` | 必填 | 自然语言或关键词，送入召回路由 |
 | `scope` | 必填 | scope 前缀 |
 | `k` | `10` | 重排后最多返回条数 |
-| `full` | `False` | `True` 时在 `hit.item.content` 返回 L2 |
+| `full` | `False` | `True` 时在 `hit.item.content` 返回 L0 |
 | `stage` | `None` | 按 Stage 过滤 |
 | `tags` | `None` | 条目须包含**全部**指定 tag |
 | `filters` | `None` | 可含 `stage`、`tags`、`min_confidence` |
@@ -175,7 +175,7 @@ response = ctx.retrieve(
 3. **合并去重** — 按 item id 合并  
 4. **重排** — `heuristic` 或 `llm`  
 5. **读策略过滤** — ACL  
-6. **塑形** — 默认去掉有 summary 的 hit 的 L2，标 `layer="summary"`  
+6. **塑形** — 默认去掉有 summary 的 hit 的 L0，标 `layer="summary"`  
 7. **访问统计** — 命中条目 `touch()`  
 
 **File 后端**：子串匹配，查询宜用短关键词（如 `"回滚"`、`"向量"`），不宜用过长口语问句。
@@ -199,7 +199,7 @@ response = ctx.retrieve(
 | `full_via` | 固定 `"expand"` |
 | `hint` | 给弱模型的自然语言提示，建议对摘要不足的 id 调 expand |
 
-未配置 summarizer 且 `full=False` 时可能只有 L2，并**一次性** `warnings.warn`。
+未配置 summarizer 且 `full=False` 时可能只有 L0，并**一次性** `warnings.warn`。
 
 ---
 
@@ -208,7 +208,7 @@ response = ctx.retrieve(
 | 方式 | Token 成本 | 适用 |
 |------|------------|------|
 | 默认 `retrieve()` | 低（L1） | 大多数对话轮次 |
-| `full=True` | 高（top‑k 全 L2） | `k` 很小且总要全文 |
+| `full=True` | 高（top‑k 全 L0） | `k` 很小且总要全文 |
 | `retrieve` + `expand(子集)` | 中 | **推荐** Agent 方案 |
 
 ```python
@@ -249,7 +249,7 @@ for spec in ctx.tools():
 | 工具名 | 作用 |
 |--------|------|
 | `retrieve` | `query`、`scope`、可选 `k`、`full` |
-| `expand` | `ids`、`scope` → L2 |
+| `expand` | `ids`、`scope` → L0 |
 
 典型两轮：先 `retrieve` 拿摘要与 id → 再对 1–3 个 id `expand`。
 

@@ -189,7 +189,7 @@ def _build_settings() -> ContextSeekSettings:
             model=llm_model,
             kwargs=llm_kwargs,
         ),
-        summarizer=SummarizerSettings(provider="llm", l0_max_chars=120, l1_max_chars=1500),
+        summarizer=SummarizerSettings(provider="llm", l2_max_chars=120, l1_max_chars=1500),
         retrieval=RetrievalSettings(
             recall_routes=["phrase", "terms", "vector"],
             reranker_mode="llm",

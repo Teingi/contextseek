@@ -32,16 +32,16 @@ item = ctx.add(
 |-------|-------------|
 | `id` | Auto-generated hex ID |
 | `scope` | Tenant/project/subject path |
-| `content` | L2 payload: string or JSON-serializable dict |
+| `content` | L0 payload: string or JSON-serializable dict |
 
 **Retrievable surface**
 
 | Field | Description |
 |-------|-------------|
-| `abstract` | L0 (~100 chars) — embedding input when summarizer runs |
+| `abstract` | L2 (~100 chars) — embedding input when summarizer runs |
 | `summary` | L1 (~2k chars) — default text returned by `retrieve()` |
 | `tags` | Filter dimensions; **all** listed tags must match when filtering |
-| `embedding` | Vector of L0 (or L2 fallback) |
+| `embedding` | Vector of L2 (or L0 fallback) |
 | `searchable` | `False` after archive or soft-delete |
 | `relevance_boost` | Score multiplier from positive `feedback()` calls |
 

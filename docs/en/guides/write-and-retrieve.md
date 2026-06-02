@@ -8,8 +8,8 @@ This guide is the practical companion to [Core concepts](core-concepts.md). It w
 |-----------|--------|---------|-------------|
 | Write | `add()` | `ContextItem` | Ingest user text, docs, traces, tool output |
 | Ranked read | `retrieve()` | `RetrieveResponse` | Inject context into the next model turn |
-| L2 upgrade | `expand()` | `list[ContextItem]` | Load full bodies for selected hits |
-| L2 by id | `expand_by_ids()` | `list[ContextItem]` | HTTP/MCP bridges without `SearchHit` objects |
+| L0 upgrade | `expand()` | `list[ContextItem]` | Load full bodies for selected hits |
+| L0 by id | `expand_by_ids()` | `list[ContextItem]` | HTTP/MCP bridges without `SearchHit` objects |
 | Enumerate | `items()` | `list[ContextItem]` | Admin, evolution, debugging (not ranked) |
 | Agent tools | `tools()` | `list[ToolSpec]` | OpenAI / Anthropic function definitions |
 
@@ -20,7 +20,7 @@ sequenceDiagram
   participant Store as Storage
 
   App->>SC: add(content, scope, source)
-  SC->>SC: provenance, L0/L1, embed, conflict check
+  SC->>SC: provenance, L2/L1, embed, conflict check
   SC->>Store: write(ref, payload)
   SC-->>App: ContextItem
 
@@ -30,7 +30,7 @@ sequenceDiagram
   SC-->>App: RetrieveResponse (SearchHits)
 
   App->>SC: expand(selected hits)
-  SC->>Store: read full L2 per id
+  SC->>Store: read full L0 per id
   SC-->>App: list[ContextItem]
 ```
 
@@ -100,8 +100,8 @@ Understanding the pipeline helps debug “why is search slow” or “why no sum
 2. **Provenance** — Built from `source` + `source_type` (+ optional `confidence`).
 3. **Stage / stability** — Heuristic inference, or LLM classifier when `EVOLUTION_LLM_STAGE_INFER_ENABLED=true`.
 4. **Conflict check** — Exact duplicates raise `ValueError`. Near-duplicates get tag `near_duplicate`; contradictions get `has_contradiction` and `refuted_by` links.
-5. **Summarizer** — If configured (`SUMMARIZER_PROVIDER=llm` + working `LLM_*`), generates `abstract` (L0) and `summary` (L1).
-6. **Embedder** — If configured, embeds L0 abstract (falls back to full L2 text).
+5. **Summarizer** — If configured (`SUMMARIZER_PROVIDER=llm` + working `LLM_*`), generates `abstract` (L2) and `summary` (L1).
+6. **Embedder** — If configured, embeds L2 abstract (falls back to full L0 text).
 7. **Persist** — Serialized to storage under `contextseek://{scope}/{id}`.
 
 Without summarizer + embedder, items are still searchable via **phrase/term** recall on backends that support substring search (e.g. FileBackend).
@@ -147,7 +147,7 @@ for hit in response:
 | `query` | (required) | Natural language or keyword string passed to recall routes. |
 | `scope` | (required) | Scope prefix; storage lists refs under this prefix. |
 | `k` | `10` | Max hits after rerank (also capped by internal candidate pool). |
-| `full` | `False` | If `True`, return L2 in `hit.item.content` and set `layer="full"`. |
+| `full` | `False` | If `True`, return L0 in `hit.item.content` and set `layer="full"`. |
 | `stage` | `None` | Filter to one `Stage`. |
 | `tags` | `None` | Item must contain **all** listed tags. |
 | `filters` | `None` | Dict: `stage`, `tags`, `min_confidence` (merged with explicit args). |
@@ -182,7 +182,7 @@ For each `retrieve()` call:
 3. **Merge & dedupe** — Candidates from all routes merged by item id.
 4. **Rerank** — `heuristic` (default) or `llm` when `RETRIEVAL_RERANKER_MODE=llm`.
 5. **Policy filter** — Read ACL; drop denied hits.
-6. **Shape** — Unless `full=True`, strip L2 from hits that have L1 `summary` and set `layer="summary"`.
+6. **Shape** — Unless `full=True`, strip L0 from hits that have L1 `summary` and set `layer="summary"`.
 7. **Access tracking** — Matched items get `touch()` (increments `access_count`).
 
 **File backend note:** recall is substring-based. Prefer short, distinctive query terms (`"rollback"`, `"向量"`) rather than long conversational sentences.
@@ -206,7 +206,7 @@ For each `retrieve()` call:
 | `full_via` | Always `"expand"` — programmatic hint for clients. |
 | `hint` | Natural-language nudge for LLMs to call `expand` when summaries are insufficient. |
 
-When `summarizer` is disabled and `full=False`, you may get L2-only hits, `layer="full"`, and a **one-time** `warnings.warn` suggesting summarizer configuration.
+When `summarizer` is disabled and `full=False`, you may get L0-only hits, `layer="full"`, and a **one-time** `warnings.warn` suggesting summarizer configuration.
 
 ---
 
@@ -215,7 +215,7 @@ When `summarizer` is disabled and `full=False`, you may get L2-only hits, `layer
 | Approach | Token cost | When to use |
 |----------|------------|-------------|
 | Default `retrieve()` | Low — L1 only | Most agent turns; let the model pick ids to deepen |
-| `retrieve(..., full=True)` | High — all top‑k L2 bodies | Small `k`, always need full text |
+| `retrieve(..., full=True)` | High — all top‑k L0 bodies | Small `k`, always need full text |
 | `retrieve()` + `expand(subset)` | Medium — pay only for chosen ids | **Recommended** for agents |
 
 ```python
@@ -226,7 +226,7 @@ candidates = [h for h in response if h.score >= 0.55][:3]
 full_items = ctx.expand(candidates)
 
 for item in full_items:
-    print(item.content_text)  # full L2
+    print(item.content_text)  # full L0
 ```
 
 `expand()` reads storage using `hit.item.scope` and `hit.item.id` — you do **not** pass `scope` again.
@@ -276,7 +276,7 @@ for spec in ctx.tools():
 | Tool name | Purpose |
 |-----------|---------|
 | `retrieve` | `query`, `scope`, optional `k`, `full` |
-| `expand` | `ids`, `scope` → L2 bodies |
+| `expand` | `ids`, `scope` → L0 bodies |
 
 Typical agent loop:
 

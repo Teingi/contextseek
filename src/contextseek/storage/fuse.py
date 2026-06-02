@@ -75,7 +75,7 @@ class ContextSeekFUSEAdapter:
         if not filename.endswith(".json"):
             return None
         item_id = filename.removesuffix(".json")
-        # Search for the specific item, ask for full L2 since we serialize content
+        # Search for the specific item, ask for full L0 since we serialize content
         response = self.client.retrieve(item_id, scope=self.scope, k=5, full=True)
         for hit in response:
             if hit.item.id == item_id:

@@ -28,7 +28,7 @@ contextseek --help
 |------|------|
 | `add` | 写入 |
 | `retrieve` | 检索（`--k`、`--full`） |
-| `expand` | 按 `--ids` 升档 L2 |
+| `expand` | 按 `--ids` 升档 L0 |
 | `compact` | 演进（`--dry-run`） |
 | `forget` / `delete` | 软删 / 硬删 |
 | `overview` | Scope 汇总 |

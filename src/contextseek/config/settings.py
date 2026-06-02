@@ -182,7 +182,7 @@ class LLMSettings(BaseSettings):
 
 
 class SummarizerSettings(BaseSettings):
-    """Summarizer configuration — drives L0/L1 generation in ``ContextSeek.add()``.
+    """Summarizer configuration — drives L2/L1 generation in ``ContextSeek.add()``.
 
     Reuses the global ``LLM_*`` configuration when ``provider="llm"``.
     """
@@ -190,14 +190,14 @@ class SummarizerSettings(BaseSettings):
     model_config = nested_section_config("SUMMARIZER_")
 
     provider: str = "llm"
-    """Provider: ``"none"`` (disabled) or ``"llm"`` (LLM-driven L0/L1 generation).
+    """Provider: ``"none"`` (disabled) or ``"llm"`` (LLM-driven L2/L1 generation).
 
     Default is ``"llm"`` — when no LLM is configured, the factory returns
-    ``None`` and ContextSeek falls back to flat L2-only behavior.
+    ``None`` and ContextSeek falls back to flat L0-only behavior.
     """
 
-    l0_max_chars: int = 100
-    """Maximum character budget for L0 abstracts (default 100)."""
+    l2_max_chars: int = 100
+    """Maximum character budget for L2 abstracts (default 100)."""
 
     l1_max_chars: int = 2000
     """Maximum character budget for L1 overviews (default 2000)."""

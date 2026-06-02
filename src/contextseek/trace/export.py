@@ -74,7 +74,7 @@ class TraceExporter:
         """Export all traces in a scope as training records."""
         from contextseek.domain.stages import Stage
 
-        # Search for raw trace items in the scope; need full L2 to access content dict
+        # Search for raw trace items in the scope; need full L0 to access content dict
         response = self.client.retrieve(
             "trace",
             scope=scope,
