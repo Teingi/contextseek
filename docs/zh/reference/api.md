@@ -315,16 +315,23 @@ print(f"merged={report.merged_count}, archived={report.archived_count}")
 preview = ctx.compact(scope="acme/bot/user_42", dry_run=True)
 ```
 
-### `dream(*, scope, dry_run=False) → DreamReport`
+### `dream(*, scope, dry_run=False, force=True) → DreamReport`
 
-触发 dream 周期：整合（在 scope 内发现模式，合成新 `extracted` 条目）和发散（生成跨簇假设）。Dream 条目置信度低，会自然衰减，除非被 `feedback()` 强化。
+触发 dream 周期：整合（发现反复模式）、发散（生成跨簇假设）以及毕业（将被强化的 dream 条目升级为稳定知识）。新生成的 dream 条目是低置信度 `extracted` 条目，会自然衰减，除非被 `feedback()` 强化。
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `scope` | 必填 | 要执行 dream 的 scope |
+| `dry_run` | `False` | 仅计算报告，不持久化新条目和毕业条目 |
+| `force` | `True` | 显式/手动调用时绕过冷却 |
 
 ```python
 report = ctx.dream(scope="acme/bot/user_42")
 print(f"生成 {report.total_dream_items} 条 dream 条目")
+print(f"毕业 {len(report.graduated_items)} 条")
 ```
 
-`DREAM_LLM_ENABLED=true` 启用 LLM 辅助合成；否则仅用关键词重叠启发式。
+当 `force=False` 时，`DREAM_COOLDOWN_HOURS` 才会参与冷却判断。调度器/daemon 路径会通过 `dream_state.json` 按 scope 持久化冷却状态。
 
 ### `overview(*, scope) → EvolutionReport`
 
@@ -436,7 +443,7 @@ with canary_ctx.tag(actor={"experiment": "canary"}):
 | `RetrieveResponse` | 可迭代 `SearchHit`；含 `.meta`（layer、hint） |
 | `SearchHit` | `.item`、`.score`、`.layer` |
 | `CompactReport` | `.merged_count`、`.archived_count`、`.evolved_count`、`.details` |
-| `DreamReport` | `.consolidation`、`.divergence`、`.total_dream_items` |
+| `DreamReport` | `.consolidation`、`.divergence`、`.graduated_items`、`.total_dream_items`、`.skipped_cooldown`、`.timestamp` |
 | `EvolutionReport` | 各 stage 计数 + 演化建议 |
 | `EvidenceChain` | `.nodes`、`.overall_confidence`、`.conflicts`、`.critical_path` |
 | `ScopeTree` | `.nodes`（`ScopeNode` 树）；`.print()` 输出可视树 |

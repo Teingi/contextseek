@@ -65,18 +65,21 @@ print(f"would merge {preview.merged_count} items")
 - **Consolidation** — finds recurring patterns across many items in the scope and synthesizes new `extracted` items representing those patterns
 - **Divergence** — generates hypotheses bridging two dissimilar clusters, creating new speculative items with low confidence
 
-Dream items are tagged `dream:consolidation` or `dream:divergence`, start at `Stage.extracted`, and carry low confidence. They decay unless reinforced by `feedback()`.
+Dream items are tagged `dreamed` plus `consolidation` or `divergence`, start at `Stage.extracted`, and carry low confidence. They decay unless reinforced by `feedback()`. Reinforced dream items can graduate to `Stage.knowledge` with tag `graduated`.
 
 ```python
 report = ctx.dream(scope="acme/bot/user_42")
 print(f"generated {report.total_dream_items} dream items "
       f"({len(report.consolidation.items)} consolidation, "
       f"{len(report.divergence.items) if report.divergence else 0} divergence)")
+print(f"graduated {len(report.graduated_items)} items")
 ```
 
 **When to run:** after large write batches, or on a scheduler during off-peak hours. Do not run `dream()` on every request.
 
-**LLM mode:** set `DREAM_LLM_ENABLED=true` for richer synthesis. Without it, dream uses keyword-overlap heuristics.
+**Cooldown behavior:** `ctx.dream()` defaults to `force=True`, so explicit/manual calls bypass cooldown. Use `force=False` to enforce cooldown, or use scheduler/daemon where per-scope cooldown is persisted.
+
+**LLM mode:** `DREAM_LLM_ENABLED` defaults to `true` for richer synthesis. Set it to `false` to force heuristic-only behavior.
 
 ```python
 # Dry run — inspect without persisting

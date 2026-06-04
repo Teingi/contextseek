@@ -268,13 +268,15 @@ class TestDivergenceEngine:
         strategy = DreamStrategy(divergence_min_clusters=2, divergence_max_outputs=3)
         engine = DivergenceEngine(strategy=strategy)
 
+        # Reps share the concept "scaling" so a fallback hypothesis is produced
+        # (the no-LLM path only emits when the two reps share a real concept).
         cluster_a = [
-            _make_item(content="database replication strategy", tags=["infra"]),
-            _make_item(content="database backup plan", tags=["infra"]),
+            _make_item(content="database scaling replication strategy", tags=["infra"]),
+            _make_item(content="database scaling backup plan", tags=["infra"]),
         ]
         cluster_b = [
-            _make_item(content="user onboarding flow design", tags=["product"]),
-            _make_item(content="user retention metrics", tags=["product"]),
+            _make_item(content="user scaling onboarding flow", tags=["product"]),
+            _make_item(content="user scaling retention metrics", tags=["product"]),
         ]
 
         result = engine.diverge([cluster_a, cluster_b])
@@ -589,3 +591,247 @@ class TestContextSeekDreamAPI:
         if report.total_dream_items > 0:
             after_count = len(ctx._list_items(scope))
             assert after_count > before_count
+
+
+# ═══════════════════════════════════════════
+# Graduation (reinforced dream → durable knowledge)
+# ═══════════════════════════════════════════
+
+
+class TestDreamGraduation:
+    def _strategy(self, **overrides):
+        base = dict(
+            min_items_for_dream=1,
+            cooldown_hours=0.0,
+            graduation_min_access=3,
+            graduation_min_age_hours=48.0,
+            graduation_min_importance=0.3,
+            graduation_confidence=0.7,
+        )
+        base.update(overrides)
+        return DreamStrategy(**base)
+
+    def test_reinforced_dream_item_graduates(self):
+        """A dreamed item past all thresholds matures into stable knowledge."""
+        engine = DreamEngine(strategy=self._strategy())
+        old = _utc_now() - timedelta(hours=72)
+        dreamed = _make_item(
+            content="useful consolidated insight about deployments",
+            tags=["dreamed", "consolidation"],
+            access_count=5,
+            created_at=old,
+            importance=0.6,
+        )
+
+        report = engine.dream([dreamed])
+
+        assert dreamed in report.graduated_items
+        assert dreamed.stage == Stage.knowledge
+        assert dreamed.stability == Stability.stable
+        assert "dreamed" not in dreamed.tags
+        assert "graduated" in dreamed.tags
+        assert dreamed.provenance.confidence >= 0.7
+
+    def test_dream_item_below_thresholds_does_not_graduate(self):
+        """Items failing any of access/age/importance stay as transient dreams."""
+        engine = DreamEngine(strategy=self._strategy())
+        old = _utc_now() - timedelta(hours=72)
+        young = _utc_now() - timedelta(hours=1)
+
+        low_access = _make_item(
+            content="insight a",
+            tags=["dreamed"],
+            access_count=1,
+            created_at=old,
+            importance=0.6,
+        )
+        too_young = _make_item(
+            content="insight b",
+            tags=["dreamed"],
+            access_count=5,
+            created_at=young,
+            importance=0.6,
+        )
+        low_importance = _make_item(
+            content="insight c",
+            tags=["dreamed"],
+            access_count=5,
+            created_at=old,
+            importance=0.1,
+        )
+
+        report = engine.dream([low_access, too_young, low_importance])
+
+        assert report.graduated_items == []
+        for it in (low_access, too_young, low_importance):
+            assert it.stage == Stage.extracted
+            assert "dreamed" in it.tags
+            assert "graduated" not in it.tags
+
+    def test_already_graduated_item_is_not_regraduated(self):
+        """An item already graduated (no 'dreamed' tag) is left alone."""
+        engine = DreamEngine(strategy=self._strategy())
+        old = _utc_now() - timedelta(hours=72)
+        item = _make_item(
+            content="already mature insight",
+            tags=["graduated"],
+            access_count=5,
+            created_at=old,
+            importance=0.6,
+            stage=Stage.knowledge,
+        )
+
+        report = engine.dream([item])
+        assert report.graduated_items == []
+
+    def test_graduation_can_be_disabled(self):
+        engine = DreamEngine(strategy=self._strategy(graduation_enabled=False))
+        old = _utc_now() - timedelta(hours=72)
+        dreamed = _make_item(
+            content="insight",
+            tags=["dreamed"],
+            access_count=5,
+            created_at=old,
+            importance=0.6,
+        )
+        report = engine.dream([dreamed])
+        assert report.graduated_items == []
+        assert dreamed.stage == Stage.extracted
+
+
+# ═══════════════════════════════════════════
+# Quality gate (no-LLM noise suppression)
+# ═══════════════════════════════════════════
+
+
+class TestDreamQualityGate:
+    def test_consolidation_skips_trivial_shared_tokens(self):
+        """No LLM + only short shared tokens → no pattern item (no noise)."""
+        strategy = DreamStrategy(
+            consolidation_min_access=1,
+            consolidation_similarity_range=(0.3, 0.8),
+            consolidation_min_shared_tokens=2,
+        )
+        engine = ConsolidationEngine(strategy=strategy)
+        # jaccard("to be or not", "to be or yes") = 3/5 = 0.6 (in window),
+        # but the only shared tokens (to/be/or) are all <=2 chars → skip.
+        items = [
+            _make_item(content="to be or not"),
+            _make_item(content="to be or yes"),
+        ]
+        result = engine.consolidate(items)
+        assert result.items == []
+        assert result.patterns_found == 0
+
+    def test_consolidation_emits_with_meaningful_shared_tokens(self):
+        strategy = DreamStrategy(
+            consolidation_min_access=1,
+            consolidation_similarity_range=(0.2, 0.9),
+            consolidation_min_shared_tokens=2,
+        )
+        engine = ConsolidationEngine(strategy=strategy)
+        items = [
+            _make_item(content="deployment staging memory issue alpha"),
+            _make_item(content="deployment staging memory issue beta"),
+        ]
+        result = engine.consolidate(items)
+        assert len(result.items) >= 1
+
+    def test_divergence_skips_without_shared_concepts(self):
+        """No LLM + no overlapping concepts → no empty-speculation item."""
+        strategy = DreamStrategy(divergence_min_clusters=2)
+        engine = DivergenceEngine(strategy=strategy)
+        cluster_a = [_make_item(content="alpha beta", tags=["a"])]
+        cluster_b = [_make_item(content="gamma delta", tags=["b"])]
+        result = engine.diverge([cluster_a, cluster_b])
+        assert result.items == []
+
+
+# ═══════════════════════════════════════════
+# Persistent per-scope cooldown
+# ═══════════════════════════════════════════
+
+
+class TestDreamCooldownPersistence:
+    def _items(self):
+        return [
+            _make_item(content="alpha beta gamma topic one"),
+            _make_item(content="alpha beta gamma topic two"),
+        ]
+
+    def test_persistent_cooldown_blocks_fresh_engine(self, tmp_path):
+        """A new engine instance is still throttled via the persistent store.
+
+        Regression for the original dead-code cooldown: every call builds a
+        fresh DreamEngine, so without external state nothing was ever throttled.
+        """
+        from contextseek.policies.dream_state import DreamStateStore
+
+        store = DreamStateStore(tmp_path / "dream_state.json")
+        strategy = DreamStrategy(
+            min_items_for_dream=1, cooldown_hours=6.0, consolidation_min_access=1
+        )
+        scope = "s/p/x"
+        items = self._items()
+
+        e1 = DreamEngine(strategy=strategy)
+        r1 = e1.dream(items, last_dream_time=store.get(scope))
+        assert r1.skipped_cooldown is False
+        store.set(scope, r1.timestamp)
+
+        # A brand-new engine must be blocked by the persisted timestamp.
+        e2 = DreamEngine(strategy=strategy)
+        r2 = e2.dream(items, last_dream_time=store.get(scope))
+        assert r2.skipped_cooldown is True
+        assert r2.total_dream_items == 0
+
+    def test_force_bypasses_persistent_cooldown(self, tmp_path):
+        from contextseek.policies.dream_state import DreamStateStore
+
+        store = DreamStateStore(tmp_path / "dream_state.json")
+        strategy = DreamStrategy(
+            min_items_for_dream=1, cooldown_hours=6.0, consolidation_min_access=1
+        )
+        scope = "s/p/x"
+        items = self._items()
+        store.set(scope, _utc_now())
+
+        engine = DreamEngine(strategy=strategy)
+        report = engine.dream(items, last_dream_time=store.get(scope), force=True)
+        assert report.skipped_cooldown is False
+
+
+class TestDreamStateStore:
+    def test_set_get_roundtrip(self, tmp_path):
+        from contextseek.policies.dream_state import DreamStateStore
+
+        store = DreamStateStore(tmp_path / "d.json")
+        ts = _utc_now()
+        store.set("a/b/c", ts)
+        got = store.get("a/b/c")
+        assert got is not None
+        assert abs((got - ts).total_seconds()) < 1.0
+
+    def test_missing_file_returns_none(self, tmp_path):
+        from contextseek.policies.dream_state import DreamStateStore
+
+        store = DreamStateStore(tmp_path / "missing.json")
+        assert store.get("anything") is None
+
+    def test_corrupt_file_treated_as_empty(self, tmp_path):
+        from contextseek.policies.dream_state import DreamStateStore
+
+        path = tmp_path / "corrupt.json"
+        path.write_text("not valid json {{", encoding="utf-8")
+        store = DreamStateStore(path)
+        assert store.get("x") is None
+        # set still recovers and overwrites cleanly
+        store.set("x", _utc_now())
+        assert store.get("x") is not None
+
+    def test_isolates_scopes(self, tmp_path):
+        from contextseek.policies.dream_state import DreamStateStore
+
+        store = DreamStateStore(tmp_path / "d.json")
+        store.set("scope/one", _utc_now())
+        assert store.get("scope/two") is None

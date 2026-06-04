@@ -306,7 +306,24 @@ class DreamSettings(BaseSettings):
 
     model_config = nested_section_config("DREAM_")
 
-    llm_enabled: bool = False
+    llm_enabled: bool = True
+    # Triggers
+    min_items_for_dream: int = 10
+    cooldown_hours: float = 6.0
+    # Consolidation
+    consolidation_min_access: int = 2
+    consolidation_similarity_low: float = 0.35
+    consolidation_similarity_high: float = 0.72
+    consolidation_max_outputs: int = 5
+    consolidation_min_shared_tokens: int = 2
+    # Divergence
+    divergence_enabled: bool = True
+    # Graduation (reinforced dream items mature into durable knowledge)
+    graduation_enabled: bool = True
+    graduation_min_access: int = 3
+    graduation_min_age_hours: float = 48.0
+    graduation_min_importance: float = 0.3
+    graduation_confidence: float = 0.7
 
 
 class PromptSettings(BaseSettings):
@@ -514,6 +531,21 @@ def to_strategy_config(settings: ContextSeekSettings) -> "StrategyConfig":
         ),
         dream=DreamStrategy(
             llm_enabled=settings.dream.llm_enabled,
+            min_items_for_dream=settings.dream.min_items_for_dream,
+            cooldown_hours=settings.dream.cooldown_hours,
+            consolidation_min_access=settings.dream.consolidation_min_access,
+            consolidation_similarity_range=(
+                settings.dream.consolidation_similarity_low,
+                settings.dream.consolidation_similarity_high,
+            ),
+            consolidation_max_outputs=settings.dream.consolidation_max_outputs,
+            consolidation_min_shared_tokens=settings.dream.consolidation_min_shared_tokens,
+            divergence_enabled=settings.dream.divergence_enabled,
+            graduation_enabled=settings.dream.graduation_enabled,
+            graduation_min_access=settings.dream.graduation_min_access,
+            graduation_min_age_hours=settings.dream.graduation_min_age_hours,
+            graduation_min_importance=settings.dream.graduation_min_importance,
+            graduation_confidence=settings.dream.graduation_confidence,
         ),
         write=WriteStrategy(
             allow_any_source=settings.security.allow_any_source,

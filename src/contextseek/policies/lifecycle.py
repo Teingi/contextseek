@@ -44,7 +44,9 @@ class LifecycleScheduler:
     snapshot_keep: int = 7
     export_dir: Any | None = None
     export_min_confidence: float = 0.8
+    dream_state_path: Any | None = None
     _scopes: list[str] = field(default_factory=list, repr=False)
+    _dream_state: Any | None = field(default=None, repr=False)
     _timer: threading.Timer | None = field(default=None, repr=False)
     _running: bool = field(default=False, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
@@ -265,6 +267,16 @@ class LifecycleScheduler:
                 self.on_event(event)
             return None, event
 
+    def _dream_store(self) -> "Any | None":
+        """Lazily build the persistent per-scope dream cooldown store."""
+        if self.dream_state_path is None:
+            return None
+        if self._dream_state is None:
+            from contextseek.policies.dream_state import DreamStateStore
+
+            self._dream_state = DreamStateStore(self.dream_state_path)
+        return self._dream_state
+
     def _dream_scope(
         self, scope: str, *, lint_report: "Any | None" = None
     ) -> LifecycleEvent | None:
@@ -292,17 +304,38 @@ class LifecycleScheduler:
             if not items:
                 return None
 
+            # Per-scope persistent cooldown: skip if we dreamed too recently.
+            store = self._dream_store()
+            last = store.get(scope) if store is not None else None
+            if last is not None:
+                elapsed_h = (_utc_now() - last).total_seconds() / 3600
+                if elapsed_h < dream_strategy.cooldown_hours:
+                    return None
+
             # Build graph-structure-driven targets from lint hints (or fallback)
             hints = lint_report.consolidation_hints if lint_report is not None else None
             dream_targets = pick_dream_targets(items, consolidation_hints=hints)
 
+            # Use the configured LLM for pattern/hypothesis quality when enabled.
+            llm = (
+                self.client._dream_llm_call
+                if getattr(self.client, "_dream_llm_enabled", False)
+                and getattr(self.client, "llm", None) is not None
+                else None
+            )
             engine = DreamEngine(
                 strategy=dream_strategy,
                 embedder=self.client.embedder,
+                llm=llm,
+                prompt_templates=getattr(self.client, "llm_prompts", None),
             )
-            report = engine.dream(items, targets=dream_targets)
+            report = engine.dream(items, targets=dream_targets, last_dream_time=last)
 
-            if report.total_dream_items == 0:
+            # Record this run so the cooldown persists across cycles/restarts.
+            if store is not None and not report.skipped_cooldown:
+                store.set(scope, report.timestamp)
+
+            if report.total_dream_items == 0 and not report.graduated_items:
                 return None
 
             # Write dream items to adapter
@@ -319,6 +352,12 @@ class LifecycleScheduler:
                 ref = self.client.resolver.ref_for(scope, item.id)
                 self.client.adapter.write(ref, payload)
 
+            # Persist graduated items (existing items mutated in place).
+            for item in report.graduated_items:
+                payload = serialize_context_item(item)
+                ref = self.client.resolver.ref_for(scope, item.id)
+                self.client.adapter.write(ref, payload)
+
             event = LifecycleEvent(
                 scope=scope,
                 action="dream",
@@ -328,6 +367,7 @@ class LifecycleScheduler:
                     "divergence_items": len(report.divergence.items)
                     if report.divergence
                     else 0,
+                    "graduated": len(report.graduated_items),
                     "patterns_found": report.consolidation.patterns_found,
                     "total": report.total_dream_items,
                     # Targets selected by pick_dream_targets() (graph-structure driven)

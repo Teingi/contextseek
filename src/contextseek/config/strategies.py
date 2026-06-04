@@ -99,6 +99,9 @@ class DreamStrategy:
     consolidation_min_access: int = 2
     consolidation_similarity_range: tuple[float, float] = (0.35, 0.72)
     consolidation_max_outputs: int = 5
+    # Minimum shared tokens required to emit a fallback (no-LLM) pattern item.
+    # Below this, the cluster is skipped rather than emitting token-soup noise.
+    consolidation_min_shared_tokens: int = 2
     # Divergence phase
     divergence_enabled: bool = True
     divergence_cross_scope: bool = False
@@ -112,8 +115,15 @@ class DreamStrategy:
     # Triggers
     min_items_for_dream: int = 10
     cooldown_hours: float = 6.0
+    # Graduation: reinforced dream items mature into durable knowledge
+    # ("use it or lose it" — survivors that earned their place graduate).
+    graduation_enabled: bool = True
+    graduation_min_access: int = 3
+    graduation_min_age_hours: float = 48.0
+    graduation_min_importance: float = 0.3
+    graduation_confidence: float = 0.7
     # Enable LLM for consolidation pattern extraction and divergence hypothesis
-    llm_enabled: bool = False
+    llm_enabled: bool = True
 
 
 @dataclass(frozen=True)

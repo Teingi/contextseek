@@ -189,7 +189,7 @@ OceanBase 另见 `OB_*` 与 [存储后端](../guides/storage.md)。
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `DREAM_LLM_ENABLED` | `false` | 整合/发散是否用 LLM |
+| `DREAM_LLM_ENABLED` | `true` | 整合/发散是否用 LLM |
 
 ### 提示词（`PROMPT_*`）
 

@@ -65,18 +65,21 @@ print(f"将合并 {preview.merged_count} 条条目")
 - **整合（Consolidation）** — 在 scope 内发现多条目中的反复模式，合成为新的 `extracted` 条目
 - **发散（Divergence）** — 生成跨越两个不相似簇的假设，创建置信度较低的推测性新条目
 
-Dream 条目打有 `dream:consolidation` 或 `dream:divergence` 标签，初始 stage 为 `extracted`，置信度低，会自然衰减，除非通过 `feedback()` 加以强化。
+Dream 条目会带上 `dreamed` 加 `consolidation` 或 `divergence` 标签，初始 stage 为 `extracted`，置信度低，会自然衰减，除非通过 `feedback()` 加以强化。被持续强化的 dream 条目可毕业到 `Stage.knowledge`，并打上 `graduated` 标签。
 
 ```python
 report = ctx.dream(scope="acme/bot/user_42")
 print(f"生成 {report.total_dream_items} 条 dream 条目 "
       f"（整合 {len(report.consolidation.items)} 条，"
       f"发散 {len(report.divergence.items) if report.divergence else 0} 条）")
+print(f"毕业 {len(report.graduated_items)} 条")
 ```
 
 **运行时机：** 大批量写入后，或在低峰期通过调度器运行。不要在每次请求中运行 `dream()`。
 
-**LLM 模式：** 设置 `DREAM_LLM_ENABLED=true` 获得更丰富的合成效果。未配置时，dream 仅使用关键词重叠启发式。
+**冷却行为：** `ctx.dream()` 默认 `force=True`，因此显式/手动调用会绕过冷却。若要让冷却生效，请传 `force=False`，或走调度器/daemon 路径（按 scope 持久化冷却）。
+
+**LLM 模式：** `DREAM_LLM_ENABLED` 默认 `true`，可获得更丰富的合成效果。设为 `false` 可强制使用启发式回退路径。
 
 ```python
 # 预演 — 查看但不持久化

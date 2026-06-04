@@ -347,7 +347,7 @@ class ContextSeek:
     _llm_stage_infer_enabled: bool = field(default=False, repr=False)
     _llm_distill_enabled: bool = field(default=False, repr=False)
     _llm_feedback_enabled: bool = field(default=False, repr=False)
-    _dream_llm_enabled: bool = field(default=False, repr=False)
+    _dream_llm_enabled: bool = field(default=True, repr=False)
     _scope_lint: bool = field(default=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -1587,15 +1587,19 @@ class ContextSeek:
         *,
         scope: str,
         dry_run: bool = False,
+        force: bool = True,
     ):
         """Trigger a dream cycle (consolidation + divergence) on a scope.
 
         Dream items are low-confidence extracted items that decay quickly
-        unless reinforced by agent feedback.
+        unless reinforced by agent feedback. Reinforced dream items that have
+        proved useful graduate into durable knowledge.
 
         Args:
             scope: Scope to dream over.
             dry_run: If True, compute dream report without persisting items.
+            force: If True (default for manual invocation), bypass the cooldown
+                gate so an explicit call always runs.
 
         Returns:
             DreamReport with generated items and statistics.
@@ -1617,17 +1621,24 @@ class ContextSeek:
         )
 
         items = [item for _, item in self._list_items(scope)]
-        report = engine.dream(items)
+        report = engine.dream(items, force=force)
 
-        if not dry_run and report.total_dream_items > 0:
-            all_dream_items = list(report.consolidation.items)
-            if report.divergence:
-                all_dream_items.extend(report.divergence.items)
+        if not dry_run:
+            if report.total_dream_items > 0:
+                all_dream_items = list(report.consolidation.items)
+                if report.divergence:
+                    all_dream_items.extend(report.divergence.items)
 
-            for item in all_dream_items:
-                if self.embedder is not None:
-                    source = item.abstract or item.content_text
-                    item.embedding = self.embedder(source)
+                for item in all_dream_items:
+                    if self.embedder is not None:
+                        source = item.abstract or item.content_text
+                        item.embedding = self.embedder(source)
+                    self._write_item(item)
+
+            # Graduated items are existing items mutated in place; re-write them
+            # at their existing ref so the stage/stability/confidence change
+            # persists. Content is unchanged, so no re-embedding is needed.
+            for item in report.graduated_items:
                 self._write_item(item)
 
         self._emit_audit(
@@ -1639,6 +1650,7 @@ class ContextSeek:
                 "divergence_items": len(report.divergence.items)
                 if report.divergence
                 else 0,
+                "graduated": len(report.graduated_items),
                 "total": report.total_dream_items,
             },
         )

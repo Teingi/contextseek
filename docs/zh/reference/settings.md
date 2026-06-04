@@ -110,7 +110,20 @@ Provider 的 API Key（`OPENAI_API_KEY`、`DASHSCOPE_API_KEY` 等）由 LangChai
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `DREAM_LLM_ENABLED` | `false` | dream 周期中启用 LLM 辅助整合与发散 |
+| `DREAM_LLM_ENABLED` | `true` | 启用 dream 周期中的 LLM 辅助整合/发散文本生成 |
+| `DREAM_MIN_ITEMS_FOR_DREAM` | `10` | 触发一次 dream 周期所需的最少活跃条目数 |
+| `DREAM_COOLDOWN_HOURS` | `6.0` | 按 scope 生效的冷却窗口（调度器/daemon 路径） |
+| `DREAM_CONSOLIDATION_MIN_ACCESS` | `2` | consolidation 源条目的最小 `access_count` |
+| `DREAM_CONSOLIDATION_SIMILARITY_LOW` | `0.35` | consolidation 相似度窗口下界 |
+| `DREAM_CONSOLIDATION_SIMILARITY_HIGH` | `0.72` | consolidation 相似度窗口上界 |
+| `DREAM_CONSOLIDATION_MAX_OUTPUTS` | `5` | 单轮 consolidation 最多生成条目数 |
+| `DREAM_CONSOLIDATION_MIN_SHARED_TOKENS` | `2` | 无 LLM 质量门槛：最少有意义共享词数 |
+| `DREAM_DIVERGENCE_ENABLED` | `true` | 是否启用 divergence 假设生成 |
+| `DREAM_GRADUATION_ENABLED` | `true` | 是否启用 dream 条目毕业为稳定知识 |
+| `DREAM_GRADUATION_MIN_ACCESS` | `3` | 毕业所需最小 `access_count` |
+| `DREAM_GRADUATION_MIN_AGE_HOURS` | `48.0` | 毕业所需最小存活时长（小时） |
+| `DREAM_GRADUATION_MIN_IMPORTANCE` | `0.3` | 毕业所需最小 `importance` |
+| `DREAM_GRADUATION_CONFIDENCE` | `0.7` | 毕业后应用的置信度下限 |
 
 ## Prompt 模板（`PROMPT_*`）
 

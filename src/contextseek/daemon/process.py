@@ -78,6 +78,7 @@ class DaemonProcess:
             snapshot_dir=self._config_dir / "backups",
             export_dir=export_dir,
             export_min_confidence=export_min_confidence,
+            dream_state_path=self._config_dir / "dream_state.json",
         )
 
         # Register scopes from config (WATCH_PATHS doubles as scope list)

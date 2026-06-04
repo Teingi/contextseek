@@ -602,6 +602,7 @@ def run_cli(
                     "divergence_items": len(report.divergence.items)
                     if report.divergence
                     else 0,
+                    "graduated": len(report.graduated_items),
                 },
                 ensure_ascii=False,
             )

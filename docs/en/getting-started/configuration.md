@@ -201,7 +201,7 @@ Heuristic rerank also weighs token overlap, provenance, feedback (`relevance_boo
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DREAM_LLM_ENABLED` | `false` | LLM in consolidation/divergence steps |
+| `DREAM_LLM_ENABLED` | `true` | LLM in consolidation/divergence steps |
 
 ### Prompts (`PROMPT_*`)
 

@@ -110,7 +110,20 @@ When `SUMMARIZER_PROVIDER=llm` but no LLM is configured, the summarizer is skipp
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DREAM_LLM_ENABLED` | `false` | LLM-assisted consolidation and divergence in dream cycles |
+| `DREAM_LLM_ENABLED` | `true` | Enable LLM-assisted consolidation/divergence text generation |
+| `DREAM_MIN_ITEMS_FOR_DREAM` | `10` | Minimum active items before a dream cycle runs |
+| `DREAM_COOLDOWN_HOURS` | `6.0` | Per-scope cooldown window (scheduler/daemon path) |
+| `DREAM_CONSOLIDATION_MIN_ACCESS` | `2` | Minimum `access_count` for consolidation source items |
+| `DREAM_CONSOLIDATION_SIMILARITY_LOW` | `0.35` | Lower bound of consolidation similarity window |
+| `DREAM_CONSOLIDATION_SIMILARITY_HIGH` | `0.72` | Upper bound of consolidation similarity window |
+| `DREAM_CONSOLIDATION_MAX_OUTPUTS` | `5` | Max consolidation items generated per cycle |
+| `DREAM_CONSOLIDATION_MIN_SHARED_TOKENS` | `2` | No-LLM quality gate: minimum meaningful shared tokens |
+| `DREAM_DIVERGENCE_ENABLED` | `true` | Enable divergence hypothesis generation |
+| `DREAM_GRADUATION_ENABLED` | `true` | Enable graduation from dream items to durable knowledge |
+| `DREAM_GRADUATION_MIN_ACCESS` | `3` | Minimum `access_count` required for graduation |
+| `DREAM_GRADUATION_MIN_AGE_HOURS` | `48.0` | Minimum item age before graduation |
+| `DREAM_GRADUATION_MIN_IMPORTANCE` | `0.3` | Minimum `importance` required for graduation |
+| `DREAM_GRADUATION_CONFIDENCE` | `0.7` | Confidence floor applied after graduation |
 
 ## Prompts (`PROMPT_*`)
 

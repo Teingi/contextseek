@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import itertools
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -80,6 +80,12 @@ class DreamReport:
     divergence: DivergenceResult | None
     total_dream_items: int
     timestamp: datetime = field(default_factory=_utc_now)
+    # Reinforced dream items that matured into durable knowledge this cycle.
+    # These are existing items mutated in place (not new), so callers persist
+    # them by re-writing at their existing ref. Excluded from total_dream_items.
+    graduated_items: list[ContextItem] = field(default_factory=list)
+    # True when the cycle was a no-op purely because of the cooldown gate.
+    skipped_cooldown: bool = False
 
 
 # ═══════════════════════════════════════════
@@ -199,6 +205,10 @@ class ConsolidationEngine:
         result = ConsolidationResult()
         for cluster in clusters[: self._strategy.consolidation_max_outputs]:
             pattern_item = self._extract_pattern(cluster)
+            if pattern_item is None:
+                # Quality gate: nothing meaningful to say about this cluster
+                # (no LLM and no shared signal). Skip rather than emit noise.
+                continue
             result.items.append(pattern_item)
             result.patterns_found += 1
 
@@ -219,8 +229,13 @@ class ConsolidationEngine:
                 return _cosine_similarity(emb_a, emb_b)
         return _token_similarity(a.content_text, b.content_text)
 
-    def _extract_pattern(self, cluster: list[ContextItem]) -> ContextItem:
-        """Produce a consolidation item from a cluster."""
+    def _extract_pattern(self, cluster: list[ContextItem]) -> ContextItem | None:
+        """Produce a consolidation item from a cluster.
+
+        Returns ``None`` when there is no LLM output and the fallback would
+        only be token-soup noise (no meaningful shared signal) — emitting such
+        an item just creates undiscoverable cruft that decays away.
+        """
         if self._llm is not None:
             prompt = dream_consolidation_prompt(
                 cluster_items=cluster,
@@ -233,24 +248,32 @@ class ConsolidationEngine:
         else:
             pattern_text = ""
 
-        # Gather shared tokens for fallback pattern text
+        # Gather shared tokens for fallback pattern text (drop trivial tokens)
         token_sets = [_tokenize(it.content_text) for it in cluster]
         common_tokens = token_sets[0]
         for ts in token_sets[1:]:
             common_tokens = common_tokens & ts
+        meaningful_tokens = {t for t in common_tokens if len(t) > 2}
 
         # Gather shared tags
         tag_sets = [set(it.tags) for it in cluster]
         common_tags = tag_sets[0]
         for ts in tag_sets[1:]:
             common_tags = common_tags & ts
+        meaningful_tags = common_tags - {"dreamed", "consolidation", "divergence"}
 
         # Build pattern text (fallback when no LLM output)
         if not pattern_text:
-            if common_tokens:
-                pattern_text = f"Pattern: {' '.join(sorted(common_tokens))} (consolidated from {len(cluster)} sources)"
+            # Quality gate: skip clusters with no meaningful shared signal.
+            if (
+                len(meaningful_tokens) < self._strategy.consolidation_min_shared_tokens
+                and not meaningful_tags
+            ):
+                return None
+            if meaningful_tokens:
+                pattern_text = f"Pattern: {' '.join(sorted(meaningful_tokens))} (consolidated from {len(cluster)} sources)"
             else:
-                pattern_text = f"Pattern: common theme across {len(cluster)} items with tags [{', '.join(sorted(common_tags))}]"
+                pattern_text = f"Pattern: common theme across {len(cluster)} items with tags [{', '.join(sorted(meaningful_tags))}]"
 
         # Attach the cluster's highest-authority source as structured "primary
         # evidence", so the structured fields a source carries (geo, tags, ...)
@@ -338,13 +361,23 @@ class DivergenceEngine:
         pairs = list(itertools.combinations(representatives, 2))
         for rep_a, rep_b in pairs[: self._strategy.divergence_max_outputs]:
             hypothesis_item = self._generate_hypothesis(rep_a, rep_b)
+            if hypothesis_item is None:
+                # Quality gate: no LLM and no shared concepts → empty speculation.
+                continue
             result.items.append(hypothesis_item)
             result.cross_links.append((rep_a.id, rep_b.id))
 
         return result
 
-    def _generate_hypothesis(self, a: ContextItem, b: ContextItem) -> ContextItem:
-        """Generate a hypothesis item from two cross-domain representatives."""
+    def _generate_hypothesis(
+        self, a: ContextItem, b: ContextItem
+    ) -> ContextItem | None:
+        """Generate a hypothesis item from two cross-domain representatives.
+
+        Returns ``None`` when there is no LLM and the two items share no
+        concepts — a content-free "may share underlying patterns" guess is
+        noise that can never be reinforced.
+        """
         if self._llm:
             prompt = dream_divergence_prompt(
                 a=a,
@@ -358,19 +391,15 @@ class DivergenceEngine:
             tags_b = set(b.tags) - {"dreamed", "consolidation", "divergence"}
             tokens_a = _tokenize(a.content_text)
             tokens_b = _tokenize(b.content_text)
-            overlap = tokens_a & tokens_b
+            overlap = {t for t in (tokens_a & tokens_b) if len(t) > 2}
 
-            if overlap:
-                hypothesis_text = (
-                    f"Hypothesis: [{', '.join(sorted(tags_a)[:3])}] may relate to "
-                    f"[{', '.join(sorted(tags_b)[:3])}] via shared concepts: "
-                    f"{', '.join(sorted(overlap)[:5])}"
-                )
-            else:
-                hypothesis_text = (
-                    f"Hypothesis: [{', '.join(sorted(tags_a)[:3])}] and "
-                    f"[{', '.join(sorted(tags_b)[:3])}] may share underlying patterns"
-                )
+            if not overlap:
+                return None
+            hypothesis_text = (
+                f"Hypothesis: [{', '.join(sorted(tags_a)[:3])}] may relate to "
+                f"[{', '.join(sorted(tags_b)[:3])}] via shared concepts: "
+                f"{', '.join(sorted(overlap)[:5])}"
+            )
 
         return ContextItem(
             id=_generate_id(),
@@ -441,11 +470,13 @@ class DreamEngine:
         items: list[ContextItem],
         *,
         targets: "DreamTargets | None" = None,
+        last_dream_time: datetime | None = None,
+        force: bool = False,
     ) -> DreamReport:
         """Execute one full dream cycle.
 
-        Checks preconditions (cooldown, minimum items) then runs
-        consolidation and optionally divergence.
+        Checks preconditions (cooldown, minimum items) then graduates
+        reinforced dream items and runs consolidation and optionally divergence.
 
         When *targets* is provided (typically from :func:`pick_dream_targets`,
         seeded by lint's consolidation hints), the cycle is goal-directed:
@@ -453,19 +484,30 @@ class DreamEngine:
         cross-pollinates the targeted high-access items, instead of relying
         purely on time-window selection.
 
+        Args:
+            items: Items in the scope to dream over.
+            targets: Optional goal-directed targets.
+            last_dream_time: Externally-tracked last-dream timestamp (e.g. from
+                a persistent per-scope store). Takes precedence over the
+                in-memory ``_last_dream_time`` for the cooldown check, since
+                each call typically constructs a fresh engine.
+            force: When True, bypass the cooldown gate (manual invocation).
+
         Returns:
             DreamReport with all generated items and statistics.
         """
         now = datetime.now(timezone.utc)
 
-        # Check cooldown
-        if self._last_dream_time is not None:
-            elapsed_hours = (now - self._last_dream_time).total_seconds() / 3600
+        # Check cooldown (externally-supplied time wins; fresh engines have none)
+        effective_last = last_dream_time or self._last_dream_time
+        if not force and effective_last is not None:
+            elapsed_hours = (now - effective_last).total_seconds() / 3600
             if elapsed_hours < self._strategy.cooldown_hours:
                 return DreamReport(
                     consolidation=ConsolidationResult(),
                     divergence=None,
                     total_dream_items=0,
+                    skipped_cooldown=True,
                 )
 
         # Check minimum items threshold
@@ -476,6 +518,9 @@ class DreamEngine:
                 divergence=None,
                 total_dream_items=0,
             )
+
+        # Phase 0: Graduation — reinforced dream items mature into knowledge
+        graduated = self._graduate(active_items, now=now)
 
         has_targets = targets is not None and (
             targets.consolidation_pairs or targets.divergence_candidates
@@ -512,7 +557,49 @@ class DreamEngine:
             consolidation=consolidation_result,
             divergence=divergence_result,
             total_dream_items=total,
+            graduated_items=graduated,
         )
+
+    def _graduate(
+        self, items: list[ContextItem], *, now: datetime
+    ) -> list[ContextItem]:
+        """Mature reinforced dream items into durable knowledge.
+
+        A dream item graduates when it has been reinforced enough (access),
+        survived the fast dream decay (importance still above floor), and lived
+        past an observation window (age) — i.e. it proved useful instead of
+        being a one-off hit. Graduated items become stable knowledge and shed
+        the ``dreamed`` tag so they no longer decay on the accelerated schedule.
+
+        Mutates qualifying items in place and returns them for persistence.
+        """
+        strat = self._strategy
+        if not getattr(strat, "graduation_enabled", True):
+            return []
+
+        graduated: list[ContextItem] = []
+        for it in items:
+            if "dreamed" not in it.tags or "graduated" in it.tags:
+                continue
+            if it.access_count < strat.graduation_min_access:
+                continue
+            if it.importance < strat.graduation_min_importance:
+                continue
+            age_hours = (now - it.created_at).total_seconds() / 3600
+            if age_hours < strat.graduation_min_age_hours:
+                continue
+
+            it.stage = Stage.knowledge
+            it.stability = Stability.stable
+            it.tags = ["graduated"] + [t for t in it.tags if t != "dreamed"]
+            it.provenance = replace(
+                it.provenance,
+                confidence=max(it.provenance.confidence, strat.graduation_confidence),
+            )
+            it.updated_at = now
+            graduated.append(it)
+
+        return graduated
 
     def _build_clusters_for_divergence(
         self, items: list[ContextItem]

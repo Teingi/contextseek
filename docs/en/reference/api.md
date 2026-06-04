@@ -314,16 +314,23 @@ print(f"merged={report.merged_count}, archived={report.archived_count}")
 preview = ctx.compact(scope="acme/bot/user_42", dry_run=True)
 ```
 
-### `dream(*, scope, dry_run=False) → DreamReport`
+### `dream(*, scope, dry_run=False, force=True) → DreamReport`
 
-Trigger a dream cycle: consolidation (find recurring patterns across items, synthesize into new extracted items) and divergence (generate hypotheses that bridge clusters). Dream items are low-confidence `extracted` items that decay unless reinforced by `feedback()`.
+Trigger a dream cycle: consolidation (find recurring patterns), divergence (generate cross-cluster hypotheses), and graduation (promote reinforced dream items into stable knowledge). New dream items are low-confidence `extracted` items that decay unless reinforced by `feedback()`.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `scope` | required | Scope to dream over |
+| `dry_run` | `False` | Compute report without persisting generated or graduated items |
+| `force` | `True` | Bypass cooldown for explicit/manual runs |
 
 ```python
 report = ctx.dream(scope="acme/bot/user_42")
 print(f"generated {report.total_dream_items} dream items")
+print(f"graduated {len(report.graduated_items)} items")
 ```
 
-Requires `DREAM_LLM_ENABLED=true` for LLM-assisted consolidation. Without it, dream runs a keyword-overlap heuristic only.
+When `force=False`, cooldown is enforced by `DREAM_COOLDOWN_HOURS`. Scheduler/daemon paths persist cooldown per scope via `dream_state.json`.
 
 ### `overview(*, scope) → EvolutionReport`
 
@@ -438,7 +445,7 @@ with canary_ctx.tag(actor={"experiment": "canary"}):
 | `RetrieveResponse` | Iterable of `SearchHit`; also has `.meta` (layer, hint) |
 | `SearchHit` | `.item`, `.score`, `.layer` |
 | `CompactReport` | `.merged_count`, `.archived_count`, `.evolved_count`, `.details` |
-| `DreamReport` | `.consolidation`, `.divergence`, `.total_dream_items` |
+| `DreamReport` | `.consolidation`, `.divergence`, `.graduated_items`, `.total_dream_items`, `.skipped_cooldown`, `.timestamp` |
 | `EvolutionReport` | Stage counts + pending hints |
 | `EvidenceChain` | `.nodes`, `.overall_confidence`, `.conflicts`, `.critical_path` |
 | `ScopeTree` | `.nodes` (`ScopeNode` tree); `.print()` renders an annotated directory tree |
