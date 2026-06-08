@@ -9,7 +9,7 @@
     "core:window:allow-hide",
     "core:window:allow-close",
     "core:webview:allow-navigate",
-    "tauri-plugin-autostart:default",
+    "autostart:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [
