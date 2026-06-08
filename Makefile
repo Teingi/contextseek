@@ -9,7 +9,8 @@ UVICORN ?= $(PYTHON) -m uvicorn
 	build clean \
 	bump \
 	demo-langchain \
-	backend frontend
+	backend frontend \
+	desktop-server desktop-spa desktop-sidecar desktop-package desktop-dev
 
 help:
 	@echo "Available targets:"
@@ -44,6 +45,13 @@ help:
 	@echo "Dev servers:"
 	@echo "  make backend          # Start API server at 127.0.0.1:8000 (with --reload)"
 	@echo "  make frontend         # Build + serve SPA at 127.0.0.1:3000 (needs backend)"
+	@echo ""
+	@echo "Desktop (Tauri):"
+	@echo "  make desktop-server   # Run same-origin backend (API + SPA) at 127.0.0.1:\$$(DESKTOP_PORT)"
+	@echo "  make desktop-spa      # Build SPA for same-origin serving (VITE_CTX_BASE=\"\")"
+	@echo "  make desktop-sidecar  # Bundle the Python sidecar (PyInstaller)"
+	@echo "  make desktop-package  # Full desktop build: SPA + sidecar + tauri build"
+	@echo "  make desktop-dev      # Run the Tauri shell in dev mode (needs Rust + webkit2gtk-4.1)"
 	@echo ""
 	@echo "Benchmark targets are in eval/Makefile:"
 	@echo "  make -f eval/Makefile help"
@@ -124,3 +132,25 @@ frontend:
 	npm --prefix dashboard install
 	npm --prefix dashboard run build
 	npm --prefix dashboard run preview
+
+# ── Desktop (Tauri) ─────────────────────────────────────────────────────────
+# Thin wrappers over scripts/ (kept as the single source of truth, also used by
+# the desktop-build CI workflow). Run `make desktop-spa` once before
+# `desktop-server` if you want the UI served (bare API works without it).
+
+DESKTOP_PORT ?= 8000
+
+desktop-server:
+	$(UV) run contextseek desktop-server --port $(DESKTOP_PORT)
+
+desktop-spa:
+	bash scripts/build_dashboard.sh
+
+desktop-sidecar:
+	bash scripts/build_python_runtime.sh
+
+desktop-package:
+	bash scripts/package_desktop.sh
+
+desktop-dev:
+	cd desktop/tauri && cargo tauri dev
