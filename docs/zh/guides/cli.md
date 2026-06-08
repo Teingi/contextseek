@@ -128,7 +128,7 @@ contextseek init
 
 - **LifecycleScheduler** — 按 `LIFECYCLE_INTERVAL_SECONDS` 周期对已注册 scope 执行 compact + dream
 - **FileWatcher** — 监听 `WATCH_PATHS`，文件变更时增量 sync（需 `daemon` extra）
-- **MCP HTTP server** — 在 `127.0.0.1:2882` 暴露 contextseek 工具（需 `http` extra）
+- **MCP HTTP server** — 在 `127.0.0.1:39082` 暴露 contextseek 工具（需 `http` extra）
 
 ```bash
 contextseek daemon start            # 后台启动（自动 fork + detach）
@@ -298,7 +298,7 @@ run_cli(["overview", "--scope", "me/work"], client=ctx)
 | `daemon failed to start` | 看 `~/.contextseek/logs/`；确认已装 `http` extra（MCP server）与 `daemon` extra（文件监听） |
 | `sync` 监听不生效 | `WATCH_PATHS` 需在 `config.env` 配置，且需 `contextseek[daemon]`（watchdog） |
 | 检索结果为空 | 确认 scope 一致、已 `sync`/`add`、embedding 模型已加载 |
-| MCP 工具连不上 | daemon 的 MCP server 默认 `127.0.0.1:2882`；或用 `contextseek-mcp-stdio` |
+| MCP 工具连不上 | daemon 的 MCP server 默认 `127.0.0.1:39082`；或用 `contextseek-mcp-stdio` |
 
 更多见 [故障排查指南](../troubleshooting.md)。
 

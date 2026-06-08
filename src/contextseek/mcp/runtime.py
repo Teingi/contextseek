@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
+import io
 import json
 import os
 import sys
@@ -132,7 +134,7 @@ def _error_response(
     }
 
 
-_DEFAULT_DAEMON_MCP_BASE = "http://127.0.0.1:2882"
+_DEFAULT_DAEMON_MCP_BASE = "http://127.0.0.1:39082"
 
 
 def _daemon_mcp_base() -> str:
@@ -240,6 +242,42 @@ def create_sse_app(*, runtime: MCPRuntime | None = None) -> FastAPI:
         payload = await request.json()
         response = service.handle_request(dict(payload))
         return JSONResponse(response)
+
+    @app.post("/cli/run")
+    async def cli_run(request: Request) -> JSONResponse:
+        """Execute one CLI command inside daemon process."""
+        payload = await request.json()
+        argv_raw = payload.get("argv", [])
+        argv = [str(x) for x in argv_raw] if isinstance(argv_raw, list) else []
+
+        # Safety: daemon-management commands should stay in the caller process.
+        if argv and argv[0] in {"daemon", "init"}:
+            return JSONResponse(
+                {"exit_code": 1, "stdout": "", "stderr": "unsupported via daemon rpc"}
+            )
+
+        from contextseek.cli.main import run_cli
+
+        out_buf = io.StringIO()
+        err_buf = io.StringIO()
+        exit_code = 1
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            try:
+                exit_code = int(run_cli(argv, client=service.server.client))
+            except SystemExit as exc:
+                code = exc.code
+                exit_code = int(code) if isinstance(code, int) else 1
+            except Exception as exc:
+                err_buf.write(f"{type(exc).__name__}: {exc}\n")
+                exit_code = 1
+
+        return JSONResponse(
+            {
+                "exit_code": exit_code,
+                "stdout": out_buf.getvalue(),
+                "stderr": err_buf.getvalue(),
+            }
+        )
 
     return app
 

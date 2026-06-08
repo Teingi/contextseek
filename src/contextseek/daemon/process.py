@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from contextseek.client.contextseek import ContextSeek
 
-_DEFAULT_MCP_PORT = 2882
+_DEFAULT_MCP_PORT = 39082
 _DEFAULT_MCP_HOST = "127.0.0.1"
 
 

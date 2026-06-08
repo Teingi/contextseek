@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import urllib.error
+import urllib.request
 import warnings
 from collections.abc import Sequence
 
@@ -53,6 +56,46 @@ def _resolve_scope(args: argparse.Namespace, default_scope: str) -> str:
             "error: --scope is required (or set DEFAULT_SCOPE in config.env)"
         )
     return scope
+
+
+def _daemon_http_base() -> str:
+    """Return daemon HTTP base URL for local CLI forwarding."""
+    return os.environ.get("CONTEXTSEEK_MCP_HTTP", "http://127.0.0.1:39082").rstrip("/")
+
+
+def _daemon_available(base: str, timeout: float = 1.0) -> bool:
+    """Return True when daemon answers health checks."""
+    try:
+        with urllib.request.urlopen(base + "/health", timeout=timeout) as resp:
+            return 200 <= getattr(resp, "status", 200) < 300
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+
+
+def _forward_cli_to_daemon(base: str, argv: Sequence[str]) -> int:
+    """Run CLI command inside daemon process via local HTTP RPC."""
+    payload = json.dumps({"argv": list(argv)}, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(
+        base + "/cli/run",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    timeout = float(os.environ.get("CONTEXTSEEK_DAEMON_CLI_TIMEOUT", "3600"))
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+
+    out = str(data.get("stdout", ""))
+    err = str(data.get("stderr", ""))
+    if out:
+        sys.stdout.write(out)
+        if not out.endswith("\n"):
+            sys.stdout.write("\n")
+    if err:
+        sys.stderr.write(err)
+        if not err.endswith("\n"):
+            sys.stderr.write("\n")
+    return int(data.get("exit_code", 1))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -331,9 +374,22 @@ def run_cli(
     from contextseek.config.settings import ContextSeekSettings
 
     parser = build_parser()
-    args = parser.parse_args(argv)
+    raw_argv = list(argv) if argv is not None else sys.argv[1:]
+    args = parser.parse_args(raw_argv)
 
     settings = ContextSeekSettings()
+
+    # When daemon is running, execute most commands inside daemon process to
+    # keep a single embedded DB owner and avoid multi-process open conflicts.
+    if client is None and args.command not in {"init", "daemon"}:
+        base = _daemon_http_base()
+        if _daemon_available(base):
+            try:
+                return _forward_cli_to_daemon(base, raw_argv)
+            except Exception:
+                # Daemon forwarding is a best-effort fast path; fall back to
+                # local in-process execution if forwarding fails.
+                pass
 
     # Local scaffolding/process-state commands should not open the storage
     # backend. This keeps `contextseek init` usable before seekdb exists.
@@ -344,7 +400,7 @@ def run_cli(
         run_init(pathlib.Path.home() / ".contextseek")
         return 0
 
-    if args.command == "daemon" and args.daemon_command in {"stop", "status"}:
+    if args.command == "daemon":
         from contextseek.daemon.process import DaemonProcess
         import pathlib
 
@@ -358,30 +414,98 @@ def run_cli(
             print("stopped" if ok else "daemon not running")
             return 0 if ok else 1
 
-        # Evolution stats from lifecycle log (last 7 days)
-        import datetime as _dt
-        from contextseek.daemon.logger import read_lifecycle_log
+        if args.daemon_command == "status":
+            # Evolution stats from lifecycle log (last 7 days)
+            import datetime as _dt
+            from contextseek.daemon.logger import read_lifecycle_log
 
-        _log_path = config_dir / "logs" / "lifecycle.jsonl"
-        _entries = read_lifecycle_log(_log_path)
-        _evolved = None
-        _merged = None
-        if _entries:
-            _cutoff = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=7)
-            _recent = []
-            for _e in _entries:
-                _ts = _e.get("ts")
-                if _ts:
-                    try:
-                        if _dt.datetime.fromisoformat(_ts) > _cutoff:
-                            _recent.append(_e)
-                    except ValueError:
-                        pass
-            if _recent:
-                _evolved = sum(_e.get("evolved_count", 0) for _e in _recent)
-                _merged = sum(_e.get("merged_count", 0) for _e in _recent)
-        render_daemon_status(daemon.status(), evolved=_evolved, merged=_merged)
-        return 0
+            _log_path = config_dir / "logs" / "lifecycle.jsonl"
+            _entries = read_lifecycle_log(_log_path)
+            _evolved = None
+            _merged = None
+            if _entries:
+                _cutoff = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=7)
+                _recent = []
+                for _e in _entries:
+                    _ts = _e.get("ts")
+                    if _ts:
+                        try:
+                            if _dt.datetime.fromisoformat(_ts) > _cutoff:
+                                _recent.append(_e)
+                        except ValueError:
+                            pass
+                if _recent:
+                    _evolved = sum(_e.get("evolved_count", 0) for _e in _recent)
+                    _merged = sum(_e.get("merged_count", 0) for _e in _recent)
+            render_daemon_status(daemon.status(), evolved=_evolved, merged=_merged)
+            return 0
+
+        if args.daemon_command == "start":
+            if daemon.is_running():
+                print(f"  daemon already running (PID {daemon._read_pid()})")
+                return 0
+            if getattr(args, "foreground", False):
+                # Foreground mode runs daemon in-process; only here we need to
+                # initialize ContextSeek (and therefore open backend storage).
+                with suppress_backend_noise():
+                    ctx = ContextSeek.from_settings(settings=settings)
+                daemon.start_foreground(ctx)
+                return 0
+            # Background mode: spawn self with --foreground and detach.
+            import shutil
+            import subprocess
+            import time
+
+            bin_path = shutil.which("contextseek") or sys.argv[0]
+            cmd = [bin_path, "daemon", "start", "--foreground"]
+            if getattr(args, "config_dir", None):
+                cmd += ["--config-dir", args.config_dir]
+            subprocess.Popen(
+                cmd,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            pid_file = config_dir / "daemon.pid"
+            for _ in range(50):
+                if pid_file.exists() and daemon.is_running():
+                    break
+                time.sleep(0.1)
+            if daemon.is_running():
+                print(f"  contextseek daemon started (PID {daemon._read_pid()})")
+            else:
+                print("  daemon failed to start — check logs in ~/.contextseek/logs/")
+                return 1
+            return 0
+
+        if args.daemon_command == "restart":
+            daemon.stop()
+            import time
+            import shutil
+            import subprocess
+
+            time.sleep(0.5)
+            bin_path = shutil.which("contextseek") or sys.argv[0]
+            cmd = [bin_path, "daemon", "start", "--foreground"]
+            if getattr(args, "config_dir", None):
+                cmd += ["--config-dir", args.config_dir]
+            subprocess.Popen(
+                cmd,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            pid_file = config_dir / "daemon.pid"
+            for _ in range(50):
+                if pid_file.exists() and daemon.is_running():
+                    break
+                time.sleep(0.1)
+            if daemon.is_running():
+                print(f"  contextseek daemon restarted (PID {daemon._read_pid()})")
+            else:
+                print("  daemon failed to restart — check logs in ~/.contextseek/logs/")
+                return 1
+            return 0
 
     if client is None:
         with suppress_backend_noise():
@@ -830,82 +954,6 @@ def run_cli(
             )
         )
         return 0
-
-    if args.command == "daemon":
-        from contextseek.daemon.process import DaemonProcess
-        import pathlib
-
-        config_dir = pathlib.Path(
-            getattr(args, "config_dir", None) or pathlib.Path.home() / ".contextseek"
-        )
-        daemon = DaemonProcess(config_dir=config_dir)
-
-        if args.daemon_command == "start":
-            if daemon.is_running():
-                print(f"  daemon already running (PID {daemon._read_pid()})")
-                return 0
-            if getattr(args, "foreground", False):
-                daemon.start_foreground(ctx)
-                return 0
-            # Background mode: spawn self with --foreground and detach
-            import shutil
-            import subprocess
-            import time
-
-            bin_path = shutil.which("contextseek") or sys.argv[0]
-            cmd = [bin_path, "daemon", "start", "--foreground"]
-            if getattr(args, "config_dir", None):
-                cmd += ["--config-dir", args.config_dir]
-            subprocess.Popen(
-                cmd,
-                start_new_session=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            pid_file = config_dir / "daemon.pid"
-            for _ in range(50):
-                if pid_file.exists() and daemon.is_running():
-                    break
-                time.sleep(0.1)
-            if daemon.is_running():
-                print(f"  contextseek daemon started (PID {daemon._read_pid()})")
-            else:
-                print("  daemon failed to start — check logs in ~/.contextseek/logs/")
-                return 1
-            return 0
-
-        if args.daemon_command == "restart":
-            daemon.stop()
-            import time
-
-            time.sleep(0.5)
-            args.foreground = False
-            args.daemon_command = "start"
-            # re-enter start logic above via tail-call replacement
-            import shutil
-            import subprocess
-
-            bin_path = shutil.which("contextseek") or sys.argv[0]
-            cmd = [bin_path, "daemon", "start", "--foreground"]
-            if getattr(args, "config_dir", None):
-                cmd += ["--config-dir", args.config_dir]
-            subprocess.Popen(
-                cmd,
-                start_new_session=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            pid_file = config_dir / "daemon.pid"
-            for _ in range(50):
-                if pid_file.exists() and daemon.is_running():
-                    break
-                time.sleep(0.1)
-            if daemon.is_running():
-                print(f"  contextseek daemon restarted (PID {daemon._read_pid()})")
-            else:
-                print("  daemon failed to restart — check logs in ~/.contextseek/logs/")
-                return 1
-            return 0
 
     if args.command == "sync":
         from contextseek.daemon.sync_cmd import detect_format, sync_path

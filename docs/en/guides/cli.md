@@ -128,7 +128,7 @@ The daemon combines three long-running components in one process:
 
 - **LifecycleScheduler** — periodic compact + dream for registered scopes, every `LIFECYCLE_INTERVAL_SECONDS`
 - **FileWatcher** — incremental sync when `WATCH_PATHS` change (needs the `daemon` extra)
-- **MCP HTTP server** — exposes contextseek tools on `127.0.0.1:2882` (needs the `http` extra)
+- **MCP HTTP server** — exposes contextseek tools on `127.0.0.1:39082` (needs the `http` extra)
 
 ```bash
 contextseek daemon start            # background start (auto fork + detach)
@@ -298,7 +298,7 @@ The return value is the process exit code (`0` = success).
 | `daemon failed to start` | See `~/.contextseek/logs/`; confirm `http` extra (MCP server) and `daemon` extra (file watching) are installed |
 | `sync` watching has no effect | `WATCH_PATHS` must be set in `config.env` and needs `contextseek[daemon]` (watchdog) |
 | Empty retrieval | Confirm matching scope, that you ran `sync`/`add`, and the embedding model loaded |
-| MCP tools won't connect | The daemon's MCP server defaults to `127.0.0.1:2882`; or use `contextseek-mcp-stdio` |
+| MCP tools won't connect | The daemon's MCP server defaults to `127.0.0.1:39082`; or use `contextseek-mcp-stdio` |
 
 More in the [troubleshooting guide](../troubleshooting.md).
 
