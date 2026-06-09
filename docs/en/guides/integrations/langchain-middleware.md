@@ -57,7 +57,7 @@ The middleware lazily builds a `ContextSeek` client from the supplied `model` an
 | `wrap_model_call` / `awrap_model_call` | Calls `ctx.retrieve(query, scope, k=retrieval_k)` and appends a `[Relevant Context]` block to `system_message` |
 | `after_model` / `aafter_model` | When `auto_store=True`, persists the latest `Q: ... / A: ...` pair via `ctx.add()` (skips intermediate tool-calling turns) |
 | `wrap_tool_call` / `awrap_tool_call` | When `record_tool_calls=True` (default `False`), records each tool invocation (name, args, result, prior reasoning, originating user task) with `source_type=trace_extraction`. Tool-arg overrides are applied regardless of this flag |
-| `after_agent` / `aafter_agent` | When `auto_compact=True`, increments a per-scope counter and submits `ctx.compact()` to a single-worker thread pool every `compact_every` runs |
+| `after_agent` / `aafter_agent` | When `auto_compact=True`, increments a per-scope counter and submits `ctx.compact()` to a single-worker thread pool every `compact_every` runs; when `auto_dream=True`, submits `ctx.dream()` gated by both a run counter and a minimum interval (see [Dream behavior](#dream-behavior)) |
 
 ## Constructor parameters
 
@@ -71,6 +71,9 @@ The middleware lazily builds a `ContextSeek` client from the supplied `model` an
 | `record_tool_calls` | `bool` | `False` | Persist each tool invocation. Independent of `auto_store`; off by default because each recorded call triggers an extra `ctx.add()` (summarizer + embed + write) |
 | `auto_compact` | `bool` | `False` | Enable periodic background compaction |
 | `compact_every` | `int` | `20` | Run `compact()` once every N agent invocations (per scope) |
+| `auto_dream` | `bool` | `False` | Enable background dream (consolidation + divergence). Dream involves LLM calls + DB writes; off by default |
+| `dream_every` | `int` | `200` | Run counter gate for dream: trigger after N agent runs for the scope |
+| `dream_min_interval_seconds` | `float` | `3600.0` | Time gate for dream: at least N seconds since the last dream. **Both** `dream_every` and this must be satisfied |
 | `scope` | `str \| None` | `None` | Pin a fixed scope. When `None`, the middleware uses `runtime.thread_id` per session |
 
 `ctx` and `model + embedder` are mutually exclusive: pass `ctx` to reuse an already-configured client (recommended in production where the same `ContextSeek` instance is shared across HTTP handlers), or pass `model` + `embedder` for the convenience auto-build.
@@ -96,6 +99,32 @@ middleware.shutdown(wait=True)
 ```
 
 `shutdown()` is idempotent and stops accepting new compact tasks; pass `wait=False` to abandon in-flight work.
+
+## Dream behavior
+
+Dream (consolidation + divergence) is significantly heavier than compaction (it involves LLM calls + DB writes), so triggering uses a **dual gate**: a scope must accumulate ≥ `dream_every` agent runs in `after_agent` **and** at least `dream_min_interval_seconds` must have elapsed since the last dream for that scope. Both conditions must be met simultaneously before a `ctx.dream(scope=...)` is submitted to the thread pool.  Both counters are **per-scope and independent of compact**.
+
+```python
+agent = create_agent(model=model, tools=[...], middleware=[
+    ContextSeekMiddleware(
+        ctx=ctx,
+        scope="my_project",
+        auto_dream=True,               # False by default, must opt in
+        dream_every=200,               # run counter gate
+        dream_min_interval_seconds=3600,  # time gate (1 hour)
+    ),
+])
+```
+
+How it works:
+
+- When `auto_dream=False` (default), no dream ever runs — behavior is identical to not using this feature.
+- Once the run counter reaches `dream_every`, the time gate is checked: if less than `dream_min_interval_seconds` have elapsed since the last dream, **the counter stays at the threshold and is not reset**. The next `after_agent` call checks again; once the interval is satisfied, the dream fires and the counter resets.
+- Dream is submitted as a fire-and-forget background task, sharing the **same single-worker thread pool** as compact — compact and dream never run concurrently for the same scope; a per-scope `threading.Lock` prevents re-entrant submissions (if a dream is already running for a scope, the new trigger is dropped).
+- **Event-driven limitation**: triggering depends on `after_agent` being called, meaning the agent must have ongoing traffic. If a scope goes completely idle, no further dream will be triggered. For "dream even during true idle / overnight" use cases, run a standalone `contextseek daemon` instead (its `LifecycleScheduler` runs compact + dream on a timer with single-point execution across processes).
+- **In-process state**: counters and last-dream timestamps are in-memory and reset on restart (worst case: one delayed dream). In multi-process deployments each process counts independently and may each trigger — use the daemon for strictly single-point dream execution.
+
+> `shutdown(wait=True)` covers in-flight compact **and** dream tasks (they share one thread pool).
 
 ## Observability (LangSmith tracing)
 

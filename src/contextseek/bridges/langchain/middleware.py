@@ -37,6 +37,7 @@ import threading
 import weakref
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
@@ -79,7 +80,8 @@ class ContextSeekMiddleware(
     - ``wrap_tool_call``: persist tool invocations (with rationale + task) for
       provenance — gated by ``record_tool_calls`` (default ``False``)
     - ``before_agent``: lazily resolve ``scope`` from ``runtime.thread_id``
-    - ``after_agent``: throttled fire-and-forget ``ctx.compact()`` for evolution
+    - ``after_agent``: throttled fire-and-forget ``ctx.compact()`` for evolution,
+      plus idle-aware fire-and-forget ``ctx.dream()`` when ``auto_dream`` is on
     """
 
     def __init__(
@@ -96,6 +98,9 @@ class ContextSeekMiddleware(
         record_tool_calls: bool = False,
         auto_compact: bool = False,
         compact_every: int = 20,
+        auto_dream: bool = False,
+        dream_every: int = 200,
+        dream_min_interval_seconds: float = 3600.0,
         scope: str | None = None,
     ) -> None:
         super().__init__()
@@ -113,17 +118,29 @@ class ContextSeekMiddleware(
         self.record_tool_calls = record_tool_calls
         self.auto_compact = auto_compact
         self.compact_every = compact_every
+        # Dreaming (consolidation + divergence) is heavier than compact (LLM +
+        # writes), so it fires on a dual gate: at least ``dream_every`` agent
+        # runs AND at least ``dream_min_interval_seconds`` since the last dream
+        # for that scope. Both counted per scope, independently of compact.
+        self.auto_dream = auto_dream
+        self.dream_every = dream_every
+        self.dream_min_interval_seconds = dream_min_interval_seconds
         # Instance-level fallback scope. Real per-session scope lives in
         # ``_SCOPE_VAR``; this is only consulted when ``before_agent`` did not run.
         self._scope = scope
 
         self._compact_counters: dict[str, int] = {}
         self._compact_locks: dict[str, threading.Lock] = {}
-        # Guards mutations of ``_compact_counters`` / ``_compact_locks`` against
-        # concurrent ``after_agent`` calls (one per session thread).
+        # Dream bookkeeping (mirrors compact): per-scope run counter, last-dream
+        # timestamp, and re-entry locks. Guarded by ``_compact_state_lock``.
+        self._dream_counters: dict[str, int] = {}
+        self._last_dream: dict[str, datetime] = {}
+        self._dream_locks: dict[str, threading.Lock] = {}
+        # Guards mutations of ``_compact_counters`` / ``_compact_locks`` /
+        # ``_dream_*`` against concurrent ``after_agent`` calls.
         self._compact_state_lock = threading.Lock()
-        # Single-worker pool: serializes compact across scopes; per-scope lock
-        # additionally prevents same-scope re-entry.
+        # Single-worker pool: serializes compact AND dream across scopes; the
+        # per-scope locks additionally prevent same-scope re-entry.
         self._compact_executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=1, thread_name_prefix="contextseek-compact"
         )
@@ -215,6 +232,10 @@ class ContextSeekMiddleware(
     @traceable(run_type="chain", name="ContextSeek.compact")
     def _traced_compact(self, *, scope: str, dry_run: bool = False) -> Any:
         return self.ctx.compact(scope=scope, dry_run=dry_run)
+
+    @traceable(run_type="chain", name="ContextSeek.dream")
+    def _traced_dream(self, *, scope: str, dry_run: bool = False) -> Any:
+        return self.ctx.dream(scope=scope, dry_run=dry_run)
 
     # ── scope ─────────────────────────────────────────────
 
@@ -488,18 +509,46 @@ class ContextSeekMiddleware(
 
     @override
     def after_agent(self, state: AgentState[Any], runtime: Runtime[ContextT]) -> None:
-        if not self.auto_compact or self.compact_every <= 0:
-            return None
         scope = self._current_scope()
+        self._maybe_compact(scope)
+        self._maybe_dream(scope)
+        return None
+
+    def _maybe_compact(self, scope: str) -> None:
+        """Throttled compact: fire once every ``compact_every`` agent runs."""
+        if not self.auto_compact or self.compact_every <= 0:
+            return
         # Atomic read-modify-write under the state lock so concurrent
         # ``after_agent`` calls don't lose increments.
         with self._compact_state_lock:
             self._compact_counters[scope] = self._compact_counters.get(scope, 0) + 1
             if self._compact_counters[scope] < self.compact_every:
-                return None
+                return
             self._compact_counters[scope] = 0
         self._fire_compact(scope)
-        return None
+
+    def _maybe_dream(self, scope: str) -> None:
+        """Dual-gate dream: fire only after ``dream_every`` runs AND at least
+        ``dream_min_interval_seconds`` since this scope last dreamed."""
+        if not self.auto_dream or self.dream_every <= 0:
+            return
+        with self._compact_state_lock:
+            self._dream_counters[scope] = self._dream_counters.get(scope, 0) + 1
+            if self._dream_counters[scope] < self.dream_every:
+                return
+            # Count gate met — check the time gate before consuming the counter.
+            last = self._last_dream.get(scope)
+            now = datetime.now(timezone.utc)
+            if (
+                last is not None
+                and (now - last).total_seconds() < self.dream_min_interval_seconds
+            ):
+                # Too soon: keep the counter parked at the threshold so the next
+                # run re-checks the time gate (rather than resetting to 0).
+                return
+            self._dream_counters[scope] = 0
+            self._last_dream[scope] = now
+        self._fire_dream(scope)
 
     @override
     async def aafter_agent(
@@ -523,6 +572,33 @@ class ContextSeekMiddleware(
         def _run() -> None:
             try:
                 self._traced_compact(scope=scope, dry_run=False)
+            except Exception:
+                pass
+            finally:
+                lock.release()
+
+        try:
+            self._compact_executor.submit(_run)
+        except RuntimeError:
+            # Executor already shut down — drop the task and release the lock.
+            lock.release()
+
+    def _fire_dream(self, scope: str) -> None:
+        """Submit a dream task to the bounded executor.
+
+        Mirrors ``_fire_compact``: per-scope non-blocking lock skips the trigger
+        if a previous dream for this scope is still running (avoids pile-up).
+        Shares the single-worker executor, so compact and dream never run
+        concurrently for the same instance.
+        """
+        with self._compact_state_lock:
+            lock = self._dream_locks.setdefault(scope, threading.Lock())
+        if not lock.acquire(blocking=False):
+            return
+
+        def _run() -> None:
+            try:
+                self._traced_dream(scope=scope, dry_run=False)
             except Exception:
                 pass
             finally:

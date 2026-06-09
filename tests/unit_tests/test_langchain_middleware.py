@@ -572,6 +572,84 @@ class TestAfterAgent:
 
 
 # ---------------------------------------------------------------------------
+# after_agent (dream dual-gate: count + min interval)
+# ---------------------------------------------------------------------------
+
+
+class TestAfterAgentDream:
+    def test_auto_dream_off_by_default(self) -> None:
+        ctx = _fake_ctx()
+        mw = ContextSeekMiddleware(ctx=ctx, scope="s")
+        assert mw.auto_dream is False
+        for _ in range(5):
+            mw.after_agent(state={"messages": []}, runtime=None)
+        assert mw._dream_counters == {}
+        ctx.dream.assert_not_called()
+
+    def test_fires_on_count_threshold_when_interval_clear(self) -> None:
+        ctx = _fake_ctx()
+        dream_done = threading.Event()
+        ctx.dream.side_effect = lambda **kw: dream_done.set()
+
+        mw = ContextSeekMiddleware(
+            ctx=ctx,
+            scope="s",
+            auto_dream=True,
+            dream_every=3,
+            dream_min_interval_seconds=0.0,  # time gate always clear
+        )
+        mw.after_agent(state={"messages": []}, runtime=None)
+        mw.after_agent(state={"messages": []}, runtime=None)
+        assert ctx.dream.call_count == 0
+        assert mw._dream_counters["s"] == 2
+
+        mw.after_agent(state={"messages": []}, runtime=None)
+        assert mw._dream_counters["s"] == 0  # counter reset on fire
+
+        assert dream_done.wait(timeout=2.0)
+        assert ctx.dream.call_count == 1
+        ctx.dream.assert_called_with(scope="s", dry_run=False)
+
+    def test_interval_gate_blocks_when_too_soon(self) -> None:
+        ctx = _fake_ctx()
+        mw = ContextSeekMiddleware(
+            ctx=ctx,
+            scope="s",
+            auto_dream=True,
+            dream_every=1,
+            dream_min_interval_seconds=3600.0,
+        )
+        # Pretend we dreamed just now → time gate must block.
+        from datetime import datetime, timezone
+
+        mw._last_dream["s"] = datetime.now(timezone.utc)
+        mw.after_agent(state={"messages": []}, runtime=None)
+        ctx.dream.assert_not_called()
+        # Counter parked at threshold (not reset) so next run re-checks.
+        assert mw._dream_counters["s"] == 1
+
+    def test_dream_independent_of_compact(self) -> None:
+        """auto_compact off but auto_dream on → dream still fires."""
+        ctx = _fake_ctx()
+        dream_done = threading.Event()
+        ctx.dream.side_effect = lambda **kw: dream_done.set()
+
+        mw = ContextSeekMiddleware(
+            ctx=ctx,
+            scope="s",
+            auto_compact=False,
+            auto_dream=True,
+            dream_every=1,
+            dream_min_interval_seconds=0.0,
+        )
+        mw.after_agent(state={"messages": []}, runtime=None)
+        assert dream_done.wait(timeout=2.0)
+        assert ctx.dream.call_count == 1
+        ctx.compact.assert_not_called()
+        mw.shutdown(wait=True)
+
+
+# ---------------------------------------------------------------------------
 # _resolve_vector_dims
 # ---------------------------------------------------------------------------
 
