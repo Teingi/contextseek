@@ -1825,12 +1825,12 @@ class ContextSeek:
         # 3. Build embedder (None if provider="none")
         embedder = build_embedder(settings.embedding)
 
-        # 3a. Zero-config embedding: when the seekdb/sqlite backend is active and
-        # no external embedder is configured, bridge pyseekdb's built-in
-        # all-MiniLM-L6-v2 (384-dim ONNX, no API key) so retrieval uses vector
-        # search automatically. The ONNX function needs no native seekdb engine,
-        # so it works cross-platform (including where embedded seekdb does not).
-        if embedder is None and settings.storage.backend in ("seekdb", "sqlite"):
+        # 3a. Zero-config embedding: when seekdb backend is active and no external
+        # embedder is configured, bridge pyseekdb's built-in all-MiniLM-L6-v2
+        # (384-dim ONNX, no API key) so retrieval uses vector search automatically.
+        # The sqlite backend deliberately does NOT do this — it stays dependency-
+        # light (FTS by default; configure an external embedder for vector recall).
+        if embedder is None and settings.storage.backend == "seekdb":
             try:
                 import pyseekdb as _pyseekdb
 

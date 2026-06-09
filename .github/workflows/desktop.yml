@@ -54,7 +54,7 @@ jobs:
       - name: Install Python sidecar deps
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[http,seekdb,openai]" pyinstaller
+          pip install -e ".[http,openai]" pyinstaller
 
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli@^2
@@ -113,10 +113,10 @@ jobs:
       - name: Install + smoke-test desktop-server
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[http,seekdb,openai]"
+          pip install -e ".[http,openai]"
           bash scripts/build_dashboard.sh
           # Clean config so no dev .env enables an LLM that needs a key.
-          printf 'STORAGE_BACKEND=seekdb\n' > /tmp/ci.env
+          printf 'STORAGE_BACKEND=sqlite\n' > /tmp/ci.env
           CONTEXTSEEK_CONFIG=/tmp/ci.env contextseek desktop-server \
             --port 8799 --data-dir /tmp/ci-ctx &
           for i in $(seq 1 30); do

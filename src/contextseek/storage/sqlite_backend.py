@@ -77,29 +77,16 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / math.sqrt(na * nb)
 
 
-def _load_default_embedding_function() -> Any:
-    """Return pyseekdb's built-in ONNX embedding function, or ``None``.
-
-    The embedding function lives in pure Python + onnxruntime and does not need
-    seekdb's native engine, so it is usable on platforms where embedded seekdb
-    is not (e.g. Windows). Any import/load failure degrades to FTS-only recall.
-    """
-    with contextlib.suppress(Exception):
-        import pyseekdb
-
-        return pyseekdb.get_default_embedding_function()
-    return None
-
-
 class SQLiteBackend(SyncCapableMixin, BackendProtocol):
     """seekvfs backend backed by a single SQLite database file.
 
     Args:
         path: Path to the SQLite database file (parent dirs are created).
         embedding_function: Optional callable ``list[str] -> list[list[float]]``
-            used to vectorize items on write. When ``None``, pyseekdb's built-in
-            ONNX function is used if importable; otherwise the backend runs
-            FTS-only (no vector recall).
+            used to vectorize items on write. When ``None``, the backend stores
+            only precomputed embeddings already present on the payload (the
+            ContextSeek client supplies these when an embedder is configured) and
+            otherwise runs FTS-only — it pulls in no embedding dependency itself.
         rrf_k: Reciprocal Rank Fusion window/constant for hybrid search.
     """
 
@@ -125,8 +112,6 @@ class SQLiteBackend(SyncCapableMixin, BackendProtocol):
         self._conn = sqlite3.connect(self._path, check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
-        if self._ef is None:
-            self._ef = _load_default_embedding_function()
         with self._lock:
             self._conn.execute(
                 "CREATE TABLE IF NOT EXISTS context_items ("
