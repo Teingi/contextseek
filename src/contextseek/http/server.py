@@ -20,6 +20,7 @@ try:
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
     from pydantic import BaseModel, Field
+    from starlette.exceptions import HTTPException as StarletteHTTPException
 except ImportError as exc:
     msg = (
         "FastAPI dependencies are not installed. "
@@ -140,17 +141,20 @@ class SPAServingStaticFiles(StaticFiles):
     """StaticFiles that falls back to ``index.html`` for SPA routes."""
 
     async def get_response(self, path: str, scope: dict[str, Any]) -> Any:
-        response = await super().get_response(path, scope)
-        if response.status_code != 404:
-            return response
-        if scope.get("method") not in {"GET", "HEAD"}:
-            return response
-
-        root = path.split("/", 1)[0].strip()
-        if root in _API_ROOT_SEGMENTS:
-            return response
-
-        return await super().get_response("index.html", scope)
+        # Starlette's StaticFiles raises HTTPException(404) (rather than returning
+        # a 404 response) when a path has no matching file, so the SPA fallback
+        # must catch it instead of inspecting a status code.
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            if scope.get("method") not in {"GET", "HEAD"}:
+                raise
+            root = path.split("/", 1)[0].strip()
+            if root in _API_ROOT_SEGMENTS:
+                raise
+            return await super().get_response("index.html", scope)
 
 
 def _dashboard_dist_dir() -> Path | None:
