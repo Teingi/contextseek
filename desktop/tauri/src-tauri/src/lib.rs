@@ -18,7 +18,7 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
 const FIXED_PORT: u16 = 8000;
-const HEALTH_RETRIES: u32 = 60;
+const HEALTH_RETRIES: u32 = 15;
 const HEALTH_INTERVAL_MS: u64 = 500;
 const SHUTDOWN_GRACE_MS: u64 = 3500;
 const MAX_CRASH_RESTARTS_PER_MIN: usize = 3;
