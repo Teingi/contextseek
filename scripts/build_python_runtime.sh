@@ -39,6 +39,16 @@ if __name__ == "__main__":
     raise SystemExit(main())
 PYEOF
 
+# seekdb's native engine (pylibseekdb / libseekdb_python) has no Windows wheel,
+# so it's absent there. Only bundle it where it's actually installed; otherwise
+# `--collect-all`/`--copy-metadata` hard-fail on the missing package.
+SEEKDB_ARGS=()
+if "${PY}" -c "import pylibseekdb" >/dev/null 2>&1; then
+  SEEKDB_ARGS+=(--collect-all pyseekdb --collect-all pylibseekdb --hidden-import libseekdb_python)
+elif "${PY}" -c "import pyseekdb" >/dev/null 2>&1; then
+  SEEKDB_ARGS+=(--collect-all pyseekdb)
+fi
+
 "${PY}" -m PyInstaller \
   --noconfirm --clean --onefile \
   --name "${NAME}" \
@@ -46,10 +56,7 @@ PYEOF
   --workpath "${WORK}/build" \
   --specpath "${WORK}" \
   --collect-all contextseek \
-  --collect-all pyseekdb \
-  --collect-all pylibseekdb \
-  --copy-metadata pylibseekdb \
-  --hidden-import libseekdb_python \
+  ${SEEKDB_ARGS[@]+"${SEEKDB_ARGS[@]}"} \
   --collect-submodules langchain_openai \
   "${WORK}/entry.py"
 
