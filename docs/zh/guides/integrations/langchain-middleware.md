@@ -57,7 +57,7 @@ Middleware 会基于传入的 `model` 与 `embedder` 自动构建一个 `Context
 | `wrap_model_call` / `awrap_model_call` | 调用 `ctx.retrieve(query, scope, k=retrieval_k)`，把 `[Relevant Context]` 块拼到 `system_message` |
 | `after_model` / `aafter_model` | 当 `auto_store=True` 时，将最新一轮 `Q: ... / A: ...` 通过 `ctx.add()` 写入（跳过中间工具调用轮） |
 | `wrap_tool_call` / `awrap_tool_call` | 当 `record_tool_calls=True`（默认 `False`）时，记录每次工具调用（名称、参数、结果、对应 AIMessage 推理内容、用户原始 task），`source_type=trace_extraction`。工具参数覆盖不受此开关影响，始终生效 |
-| `after_agent` / `aafter_agent` | 当 `auto_compact=True` 时按 scope 计数，每 `compact_every` 次 Agent 运行向单线程池提交一次 `ctx.compact()` |
+| `after_agent` / `aafter_agent` | 当 `auto_compact=True` 时按 scope 计数，每 `compact_every` 次 Agent 运行向单线程池提交一次 `ctx.compact()`；当 `auto_dream=True` 时按「计数 + 间隔」双门控提交 `ctx.dream()`（见 [Dream 行为](#dream-行为)） |
 
 ## 构造参数
 
@@ -71,6 +71,9 @@ Middleware 会基于传入的 `model` 与 `embedder` 自动构建一个 `Context
 | `record_tool_calls` | `bool` | `False` | 是否落库每次工具调用。独立于 `auto_store`；默认关闭，因为每条记录都会触发一次额外的 `ctx.add()`（summarizer + embed + 写库） |
 | `auto_compact` | `bool` | `False` | 启用后台周期性 compact |
 | `compact_every` | `int` | `20` | 每 N 次 Agent 运行触发一次 `compact()`（按 scope 计数） |
+| `auto_dream` | `bool` | `False` | 启用后台 dream（consolidation + divergence）。dream 含 LLM + 写库，默认关闭 |
+| `dream_every` | `int` | `200` | dream 的计数门控：该 scope 累计 N 次 Agent 运行 |
+| `dream_min_interval_seconds` | `float` | `3600.0` | dream 的时间门控：距上次 dream 至少 N 秒。与 `dream_every` **同时满足**才触发 |
 | `scope` | `str \| None` | `None` | 固定 scope。`None` 时使用 `runtime.thread_id` 做 per-session 隔离 |
 
 `ctx` 与 `model + embedder` 互斥：传 `ctx` 复用已配置好的客户端（生产环境推荐，多个 HTTP handler 共用同一个 `ContextSeek` 实例）；或传 `model` + `embedder` 让 middleware 自动构建。
@@ -96,6 +99,32 @@ middleware.shutdown(wait=True)
 ```
 
 `shutdown()` 幂等，停止接受新任务；传 `wait=False` 可以放弃在途任务。
+
+## Dream 行为
+
+Dream（consolidation + divergence）比 compact 重得多（含 LLM + 写库），所以触发用**双门控**：某 scope 在 `after_agent` 累计 ≥ `dream_every` 次 Agent 运行，**且**距该 scope 上次 dream ≥ `dream_min_interval_seconds`，二者同时满足才向单线程池提交一次 `ctx.dream(scope=...)`。两个计数都**按 scope、独立于 compact**。
+
+```python
+agent = create_agent(model=model, tools=[...], middleware=[
+    ContextSeekMiddleware(
+        ctx=ctx,
+        scope="my_project",
+        auto_dream=True,               # 默认 False，需显式开启
+        dream_every=200,               # 计数门控
+        dream_min_interval_seconds=3600,  # 时间门控（1 小时）
+    ),
+])
+```
+
+工作机制：
+
+- `auto_dream=False`（默认）时完全不 dream，行为与不接入一致。
+- 计数到达 `dream_every` 后还要过时间门控：若距上次 dream 不足 `dream_min_interval_seconds`，**计数停在阈值不清零**，下一轮再检查时间，直到间隔满足才触发并清零。
+- 触发后台 fire-and-forget，复用与 compact **同一个**单 worker 线程池——compact 与 dream 不会同 scope 并发；per-scope `threading.Lock` 防止同 scope 重入（上一次 dream 还在跑则跳过本次）。
+- **事件驱动的局限**：触发依赖 `after_agent` 被调用，即 agent 要持续有流量。某 scope 一旦彻底不再活动，就不会再触发 dream。若需要「真正空闲/夜间也能 dream」，请改用独立的 `contextseek daemon`（其 `LifecycleScheduler` 定时跑 compact + dream，多进程下也只单点执行）。
+- **进程内状态**：计数器与上次 dream 时间是进程内内存态，重启清零（最坏只是推迟一次 dream）；多进程部署下每个进程各自计数，可能各自触发——需要严格单点 dream 时同样应走 daemon。
+
+> `shutdown(wait=True)` 同时覆盖在途的 compact 与 dream 任务（共用一个线程池）。
 
 ## 可观测性（LangSmith 追踪）
 
