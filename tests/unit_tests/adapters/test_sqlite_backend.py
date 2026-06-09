@@ -13,7 +13,11 @@ from seekvfs.exceptions import NotFoundError
 def _stub_ef(texts: list[str]) -> list[list[float]]:
     """Deterministic 3-dim embedder: counts of 'a', 'b', 'c' (no model download)."""
     return [
-        [float(t.lower().count("a")), float(t.lower().count("b")), float(t.lower().count("c"))]
+        [
+            float(t.lower().count("a")),
+            float(t.lower().count("b")),
+            float(t.lower().count("c")),
+        ]
         for t in texts
     ]
 
@@ -41,7 +45,9 @@ def backend(tmp_path) -> SQLiteBackend:
 
 
 def test_write_read_roundtrip(backend: SQLiteBackend) -> None:
-    backend.write("contextseek://me/work/a", _item("me/work", "abstract a", "body", "h1"))
+    backend.write(
+        "contextseek://me/work/a", _item("me/work", "abstract a", "body", "h1")
+    )
     payload = json.loads(backend.read("contextseek://me/work/a").content.decode())
     assert payload["abstract"] == "abstract a"
     assert payload["scope"] == "me/work"
@@ -70,7 +76,9 @@ def test_find_by_hash(backend: SQLiteBackend) -> None:
 
 
 def test_fts_search(backend: SQLiteBackend) -> None:
-    backend.write("contextseek://me/w/a", _item("me/w", "deployment crashed", "oom", "h1"))
+    backend.write(
+        "contextseek://me/w/a", _item("me/w", "deployment crashed", "oom", "h1")
+    )
     backend.write("contextseek://me/w/b", _item("me/w", "budget review", "money", "h2"))
     hits = backend.search("deployment", path_pattern="contextseek://me/w/*", limit=5)
     assert hits.hits and hits.hits[0].path == "contextseek://me/w/a"
@@ -80,7 +88,9 @@ def test_vector_search(backend: SQLiteBackend) -> None:
     backend.write("contextseek://s/aaa", _item("s", "aaa", "x", "h1"))
     backend.write("contextseek://s/ccc", _item("s", "ccc", "x", "h2"))
     qv = _stub_ef(["aaaa"])[0]
-    hits = backend.search("", path_pattern="contextseek://s/*", limit=5, query_embedding=qv)
+    hits = backend.search(
+        "", path_pattern="contextseek://s/*", limit=5, query_embedding=qv
+    )
     assert hits.hits[0].path == "contextseek://s/aaa"
 
 

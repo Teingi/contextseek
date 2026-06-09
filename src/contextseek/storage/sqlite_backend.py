@@ -197,7 +197,9 @@ class SQLiteBackend(SyncCapableMixin, BackendProtocol):
                 "content": text_content,
                 "abstract": abstract,
                 "summary": summary,
-                "payload_json": json.dumps(_json_safe(payload_slim), ensure_ascii=False),
+                "payload_json": json.dumps(
+                    _json_safe(payload_slim), ensure_ascii=False
+                ),
                 "scope": str(payload.get("scope") or ""),
                 "stage": str(payload.get("stage") or ""),
                 "searchable": 1 if payload.get("searchable", True) else 0,
@@ -258,9 +260,7 @@ class SQLiteBackend(SyncCapableMixin, BackendProtocol):
                 ),
             )
             if self._fts:
-                self._db.execute(
-                    "DELETE FROM context_items_fts WHERE id = ?", (path,)
-                )
+                self._db.execute("DELETE FROM context_items_fts WHERE id = ?", (path,))
                 self._db.execute(
                     "INSERT INTO context_items_fts (id, text) VALUES (?, ?)",
                     (path, fulltext_content),
@@ -286,9 +286,7 @@ class SQLiteBackend(SyncCapableMixin, BackendProtocol):
         )
 
     def _get_row(self, path: str) -> sqlite3.Row | None:
-        cur = self._db.execute(
-            "SELECT * FROM context_items WHERE id = ?", (path,)
-        )
+        cur = self._db.execute("SELECT * FROM context_items WHERE id = ?", (path,))
         cur.row_factory = sqlite3.Row
         return cur.fetchone()
 
@@ -325,15 +323,11 @@ class SQLiteBackend(SyncCapableMixin, BackendProtocol):
 
     def delete(self, path: str) -> None:
         with self._lock:
-            cur = self._db.execute(
-                "DELETE FROM context_items WHERE id = ?", (path,)
-            )
+            cur = self._db.execute("DELETE FROM context_items WHERE id = ?", (path,))
             if cur.rowcount == 0:
                 raise NotFoundError(path)
             if self._fts:
-                self._db.execute(
-                    "DELETE FROM context_items_fts WHERE id = ?", (path,)
-                )
+                self._db.execute("DELETE FROM context_items_fts WHERE id = ?", (path,))
             self._db.commit()
 
     # ------------------------------------------------------------------
@@ -511,9 +505,7 @@ class SQLiteBackend(SyncCapableMixin, BackendProtocol):
         # Rank-based score in (0, 1]; earlier hits score higher.
         return [(id_, 1.0 / (1 + i)) for i, id_ in enumerate(scoped[:n])]
 
-    def _filter_ids_by_scope(
-        self, ids: list[str], scope_key: str | None
-    ) -> list[str]:
+    def _filter_ids_by_scope(self, ids: list[str], scope_key: str | None) -> list[str]:
         if not ids:
             return []
         with self._lock:
@@ -586,9 +578,7 @@ class SQLiteBackend(SyncCapableMixin, BackendProtocol):
     ) -> list[GrepMatch]:
         with self._lock:
             self._db.row_factory = sqlite3.Row
-            rows = self._db.execute(
-                "SELECT id, content FROM context_items"
-            ).fetchall()
+            rows = self._db.execute("SELECT id, content FROM context_items").fetchall()
         out: list[GrepMatch] = []
         for row in rows:
             id_ = row["id"]
@@ -694,8 +684,7 @@ class SQLiteBackend(SyncCapableMixin, BackendProtocol):
     def visible_count_for_scope(self, scope: str) -> int:
         with self._lock:
             row = self._db.execute(
-                "SELECT COUNT(*) FROM context_items "
-                "WHERE scope = ? AND searchable = 1",
+                "SELECT COUNT(*) FROM context_items WHERE scope = ? AND searchable = 1",
                 (scope,),
             ).fetchone()
         return int(row[0]) if row else 0
