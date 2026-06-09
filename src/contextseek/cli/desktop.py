@@ -31,25 +31,18 @@ def _default_data_dir() -> Path:
 def _configure_storage(data_dir: Path) -> str:
     """Set storage env defaults (without overriding user-set values).
 
-    Defaults to embedded seekdb; falls back to the file backend when pyseekdb
-    (a native dependency) is unavailable, so the server still starts. Returns
-    the effective backend name for logging.
+    Defaults to the SQLite backend: cross-platform, no native dependency, and
+    vector recall via pyseekdb's ONNX embedder when available. Returns the
+    effective backend name for logging.
     """
     backend = os.environ.get("STORAGE_BACKEND", "").strip()
     if not backend:
-        try:
-            import pyseekdb  # noqa: F401
-
-            backend = "seekdb"
-        except ImportError:
-            backend = "file"
-            print(
-                "[desktop-server] pyseekdb not installed; falling back to file backend",
-                flush=True,
-            )
+        backend = "sqlite"
         os.environ["STORAGE_BACKEND"] = backend
 
-    if backend == "seekdb":
+    if backend == "sqlite":
+        os.environ.setdefault("SQLITE_PATH", str(data_dir / "contextseek.sqlite3"))
+    elif backend == "seekdb":
         os.environ.setdefault("SEEKDB_PATH", str(data_dir / "seekdb.db"))
     elif backend == "file":
         os.environ.setdefault("STORAGE_PATH", str(data_dir / "store"))
