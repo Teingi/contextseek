@@ -46,7 +46,10 @@ PYEOF
   --workpath "${WORK}/build" \
   --specpath "${WORK}" \
   --collect-all contextseek \
-  --collect-submodules pyseekdb \
+  --collect-all pyseekdb \
+  --collect-all pylibseekdb \
+  --copy-metadata pylibseekdb \
+  --hidden-import libseekdb_python \
   --collect-submodules langchain_openai \
   "${WORK}/entry.py"
 
