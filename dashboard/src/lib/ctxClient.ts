@@ -99,7 +99,8 @@ export const ctx = {
   evidenceChain: (req: EvidenceChainRequest) => post<EvidenceChain>("/evidence_chain", req),
   items: (req: ItemsRequest) => post<ItemsResponse>("/items", req),
   overview: (scope: string) => get<Overview>("/overview", { scope }),
-  globalOverview: () => get<GlobalOverview>("/global_overview"),
+  globalOverview: (scope?: string) =>
+    get<GlobalOverview>("/global_overview", scope ? { scope } : undefined),
   scopes: () => get<{ scopes: string[] }>("/scopes"),
   config: () => get<Config>("/config"),
   seed: () => post<SeedResponse>("/seed", {}),

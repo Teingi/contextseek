@@ -201,6 +201,21 @@ export interface Config {
   auto_sync: boolean;
   lifecycle_interval_seconds: number;
   watch_paths: WatchPath[];
+  // OceanBase (storage_backend === "oceanbase")
+  ob_host?: string;
+  ob_port?: string;
+  ob_db_name?: string;
+  ob_table_name?: string;
+  // SeekDB (storage_backend === "seekdb")
+  seekdb_mode?: "embedded" | "server";
+  seekdb_path?: string;
+  seekdb_host?: string;
+  seekdb_port?: string;
+  seekdb_database?: string;
+  // SQLite (storage_backend === "sqlite")
+  sqlite_path?: string;
+  // File (storage_backend === "file")
+  storage_path?: string;
 }
 
 // ---- request payloads ----

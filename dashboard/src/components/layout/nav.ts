@@ -1,7 +1,6 @@
 import {
   GitGraph,
   LayoutDashboard,
-  Plug,
   PlusCircle,
   Search,
   Settings,
@@ -18,7 +17,6 @@ export type PanelId =
   | "write"
   | "evolution"
   | "provenance"
-  | "ingress"
   | "skills"
   | "settings";
 
@@ -36,7 +34,6 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "write", icon: PlusCircle },
   { id: "evolution", icon: Sparkles },
   { id: "provenance", icon: GitGraph },
-  { id: "ingress", icon: Plug },
   { id: "skills", icon: Zap },
   { id: "settings", icon: Settings },
 ];

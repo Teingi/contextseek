@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { Cpu, Plug, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { Bot, Braces, Database, Info, Plug, RefreshCw, SlidersHorizontal } from "lucide-react";
 
 import { StatRows } from "@/components/charts/StatRows";
 import { Badge } from "@/components/ui/badge";
@@ -52,16 +52,9 @@ export function SettingsPanel() {
       ctx.config(),
       ctx.health(),
     ]);
-    if (cfgResult.status === "fulfilled") {
-      setConfig(cfgResult.value);
-    }
-    if (healthResult.status === "fulfilled") {
-      setHealth(healthResult.value);
-    }
-    if (
-      cfgResult.status === "rejected" &&
-      healthResult.status === "rejected"
-    ) {
+    if (cfgResult.status === "fulfilled") setConfig(cfgResult.value);
+    if (healthResult.status === "fulfilled") setHealth(healthResult.value);
+    if (cfgResult.status === "rejected" && healthResult.status === "rejected") {
       setError(true);
     }
   }, []);
@@ -72,7 +65,7 @@ export function SettingsPanel() {
       setHealth(h);
       setError(false);
     } catch {
-      // keep last known health value; don't blank it on transient errors
+      // keep last known value on transient errors
     }
   }, []);
 
@@ -99,44 +92,28 @@ export function SettingsPanel() {
     setRefreshing(false);
   };
 
+  // ── 后端连接 ──────────────────────────────────────────────────────────────
   const addr =
-    (import.meta.env.VITE_CTX_BASE as string | undefined) ||
-    (typeof window !== "undefined" ? window.location.host : "127.0.0.1:39082");
+    (import.meta.env.VITE_CTX_BASE as string | undefined) || "127.0.0.1:8000";
 
-  const connection = [{ label: t("settings.conn.addr"), value: addr }];
+  const isOk = health?.status === "ok";
+  const healthValue = (
+    <span className="flex items-center gap-1.5 text-xs">
+      <span
+        className={`h-2 w-2 rounded-full ${
+          health == null ? "bg-muted-foreground" : isOk ? "bg-emerald-500" : "bg-rose-500"
+        }`}
+      />
+      {health == null ? "…" : isOk ? t("settings.sys.daemonValue") : health.status}
+    </span>
+  );
 
-  const watchPathsValue = (() => {
-    if (!config) return "…";
-    if (!config.watch_paths || config.watch_paths.length === 0) return "—";
-    return (
-      <ul className="space-y-0.5">
-        {config.watch_paths.map((wp) => (
-          <li key={wp.path} className="font-mono text-xs">
-            {wp.path}
-            <span className="mx-1 text-muted-foreground">→</span>
-            <span className="text-muted-foreground">{wp.scope}</span>
-          </li>
-        ))}
-      </ul>
-    );
-  })();
+  const connection = [
+    { label: t("settings.conn.addr"), value: addr },
+    { label: t("settings.conn.health"), value: healthValue },
+  ];
 
-  const modelRows = config
-    ? [
-        { label: "LLM", value: config.llm_model || "—" },
-        { label: "embedding", value: config.embedding_model || "—" },
-        { label: "storage", value: config.storage_backend || "—" },
-        { label: "version", value: config.version || "—" },
-        { label: t("settings.model.watchPaths"), value: watchPathsValue },
-      ]
-    : [
-        { label: "LLM", value: "…" },
-        { label: "embedding", value: "…" },
-        { label: "storage", value: "…" },
-        { label: "version", value: "…" },
-        { label: t("settings.model.watchPaths"), value: "…" },
-      ];
-
+  // ── 系统控制 ──────────────────────────────────────────────────────────────
   const daemonStatus = health
     ? health.status === "ok"
       ? t("settings.sys.daemonValue")
@@ -169,10 +146,50 @@ export function SettingsPanel() {
     },
   ];
 
+  // ── 模型分组 ──────────────────────────────────────────────────────────────
+  const val = (v: string | undefined) => (config ? v || "—" : "…");
+
+  const llmRows = [{ label: t("settings.llm.model"), value: val(config?.llm_model) }];
+  const embedderRows = [{ label: t("settings.embedder.model"), value: val(config?.embedding_model) }];
+  const dbBackend = config?.storage_backend ?? "";
+  const dbExtra = (() => {
+    if (!config) return [];
+    if (dbBackend === "oceanbase") {
+      return [
+        { label: t("settings.db.host"), value: val(config.ob_host) },
+        { label: t("settings.db.port"), value: val(config.ob_port) },
+        { label: t("settings.db.dbName"), value: val(config.ob_db_name) },
+        { label: t("settings.db.tableName"), value: val(config.ob_table_name) },
+      ];
+    }
+    if (dbBackend === "seekdb") {
+      if (config.seekdb_mode === "server") {
+        return [
+          { label: t("settings.db.host"), value: val(config.seekdb_host) },
+          { label: t("settings.db.port"), value: val(config.seekdb_port) },
+          { label: t("settings.db.dbName"), value: val(config.seekdb_database) },
+        ];
+      }
+      return [{ label: t("settings.db.path"), value: val(config.seekdb_path) }];
+    }
+    if (dbBackend === "sqlite") {
+      return [{ label: t("settings.db.path"), value: val(config.sqlite_path) }];
+    }
+    if (dbBackend === "file") {
+      return [{ label: t("settings.db.path"), value: val(config.storage_path) }];
+    }
+    return [];
+  })();
+
+  const dbRows = [
+    { label: t("settings.db.backend"), value: val(config?.storage_backend) },
+    ...dbExtra,
+  ];
+  const aboutRows = [{ label: t("settings.about.version"), value: val(config?.version) }];
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div />
+      <div className="flex items-center justify-end">
         <Button
           variant="ghost"
           size="sm"
@@ -199,8 +216,16 @@ export function SettingsPanel() {
         <StatRows highlightFirst rows={connection} />
       </SettingsGroup>
 
-      <SettingsGroup icon={Cpu} title={t("settings.model")} desc={t("settings.model.desc")}>
-        <StatRows highlightFirst rows={modelRows} />
+      <SettingsGroup icon={Bot} title={t("settings.llm")} desc={t("settings.llm.desc")}>
+        <StatRows highlightFirst rows={llmRows} />
+      </SettingsGroup>
+
+      <SettingsGroup icon={Braces} title={t("settings.embedder")} desc={t("settings.embedder.desc")}>
+        <StatRows highlightFirst rows={embedderRows} />
+      </SettingsGroup>
+
+      <SettingsGroup icon={Database} title={t("settings.db")} desc={t("settings.db.desc")}>
+        <StatRows highlightFirst rows={dbRows} />
       </SettingsGroup>
 
       <SettingsGroup
@@ -214,6 +239,10 @@ export function SettingsPanel() {
             value: <Badge variant={s.variant}>{s.value}</Badge>,
           }))}
         />
+      </SettingsGroup>
+
+      <SettingsGroup icon={Info} title={t("settings.about")} desc={t("settings.about.desc")}>
+        <StatRows rows={aboutRows} />
       </SettingsGroup>
     </div>
   );

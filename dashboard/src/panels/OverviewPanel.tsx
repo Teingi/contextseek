@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
-import { BarList } from "@/components/charts/BarList";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { LineChart } from "@/components/charts/LineChart";
 import { StatCards } from "@/components/charts/StatCards";
 import { StatRows } from "@/components/charts/StatRows";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useScope } from "@/context/ScopeContext";
 import { useI18n } from "@/lib/i18n";
 import { ctx } from "@/lib/ctxClient";
 import type { GlobalOverview } from "@/lib/types";
@@ -18,7 +18,7 @@ const STAGE_COLORS: Record<string, string> = {
   skill: "#b694ff",
 };
 
-const HEATMAP_BASE = "#54b6ff"; // blue tint for non-zero cells
+const HEATMAP_BASE = "#54b6ff";
 
 function RelationHeatmap({
   stages,
@@ -81,13 +81,6 @@ function RelationHeatmap({
   );
 }
 
-const SCOPE_GRADIENTS = [
-  "linear-gradient(90deg,#4b8dff,#54b6ff)",
-  "linear-gradient(90deg,#57a4ff,#7ac4ff)",
-  "linear-gradient(90deg,#5bb58d,#6ed18f)",
-  "linear-gradient(90deg,#9470ff,#b694ff)",
-];
-
 function SectionCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card>
@@ -105,13 +98,15 @@ function SkeletonBlock({ className }: { className?: string }) {
 
 export function OverviewPanel() {
   const { t } = useI18n();
+  const { scope } = useScope();
   const [data, setData] = useState<GlobalOverview | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     ctx
-      .globalOverview()
+      .globalOverview(scope)
       .then((d) => {
         if (!cancelled) {
           setData(d);
@@ -124,7 +119,7 @@ export function OverviewPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [scope]);
 
   if (loading) {
     return (
@@ -139,14 +134,12 @@ export function OverviewPanel() {
     );
   }
 
-  // Derive display data from API response (or fall back to empty)
   const stageDist = data?.stage_distribution ?? {};
   const stages = ["raw", "extracted", "knowledge", "skill"];
 
   const kpis = [
     { label: t("overview.kpi.total"), value: data?.total_items ?? 0 },
     { label: t("overview.kpi.health"), value: data?.health_score ?? 0 },
-    { label: t("overview.kpi.activeScopes"), value: data?.active_scopes ?? 0 },
   ];
 
   const funnel = stages.map((s) => ({ label: s, value: stageDist[s] ?? 0 }));
@@ -155,28 +148,12 @@ export function OverviewPanel() {
     .filter((s) => (stageDist[s] ?? 0) > 0)
     .map((s) => ({ label: s, value: stageDist[s]!, color: STAGE_COLORS[s] ?? "#8888aa" }));
 
-  const scopeTop = (data?.scope_top ?? []).slice(0, 5).map((s) => ({
-    label: s.label,
-    value: s.value,
-  }));
-
-  const scopeGrowth = (data?.scope_top ?? []).slice(0, 4).map((s, i) => ({
-    label: s.label.split("/").pop() ?? s.label,
-    value: s.value,
-    color: SCOPE_GRADIENTS[i % SCOPE_GRADIENTS.length],
-  }));
-
   const trend = data?.trend ?? { labels: [], values: [] };
 
-  const conflictSubject = data?.risk_conflict_subject ?? null;
   const orphanRatio = data?.risk_orphan_ratio ?? null;
   const suggestCompact = data?.risk_suggest_compact ?? null;
 
   const risks = [
-    {
-      label: t("overview.risk.conflictSubject"),
-      value: conflictSubject ?? "—",
-    },
     {
       label: t("overview.risk.orphanRatio"),
       value: orphanRatio !== null ? `${(orphanRatio * 100).toFixed(1)}%` : "—",
@@ -194,10 +171,11 @@ export function OverviewPanel() {
 
   return (
     <div className="space-y-4 p-6">
-      <StatCards cards={kpis} />
+      <StatCards cards={kpis} columns={2} className="max-w-sm" />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-5">
+        {/* 左侧：紧凑汇总 */}
+        <div className="space-y-4 lg:col-span-2">
           <SectionCard title={t("overview.funnel")}>
             <StatRows highlightFirst rows={funnel} />
           </SectionCard>
@@ -208,21 +186,16 @@ export function OverviewPanel() {
               <p className="text-xs text-muted-foreground">{t("overview.noData") || "No data"}</p>
             )}
           </SectionCard>
-          <SectionCard title={t("overview.scopeTop")}>
-            <StatRows rows={scopeTop} />
+          <SectionCard title={t("overview.risks")}>
+            <StatRows rows={risks} />
           </SectionCard>
         </div>
 
-        <div className="space-y-4">
+        {/* 右侧：需要宽度的图表 */}
+        <div className="space-y-4 lg:col-span-3">
           <SectionCard title={t("overview.trend")}>
             <LineChart labels={trend.labels} values={trend.values} color="#54b6ff" />
           </SectionCard>
-          <SectionCard title={t("overview.scopeGrowth")}>
-            <BarList items={scopeGrowth} />
-          </SectionCard>
-        </div>
-
-        <div className="space-y-4">
           <SectionCard title={t("overview.heatmap")}>
             {data?.heatmap ? (
               <RelationHeatmap
@@ -234,9 +207,6 @@ export function OverviewPanel() {
                 {t("overview.noData") || "No link data"}
               </div>
             )}
-          </SectionCard>
-          <SectionCard title={t("overview.risks")}>
-            <StatRows rows={risks} />
           </SectionCard>
         </div>
       </div>

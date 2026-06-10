@@ -416,12 +416,13 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
         }
 
     @app.get("/global_overview")
-    async def global_overview() -> dict[str, Any]:
+    async def global_overview(scope: str | None = None) -> dict[str, Any]:
         import datetime
 
         STAGES = ["raw", "extracted", "knowledge", "skill"]
 
-        seen_scopes: list[str] = ctx.list_scopes()
+        all_scopes: list[str] = ctx.list_scopes()
+        seen_scopes: list[str] = [scope] if scope and scope in all_scopes else all_scopes
 
         # Single pass: load all items across all scopes
         total_items = 0
@@ -566,7 +567,7 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
         return {
             "total_items": total_items,
             "health_score": health_score,
-            "active_scopes": len(seen_scopes),
+            "active_scopes": len(all_scopes),
             "stage_distribution": stage_distribution,
             "scope_top": scope_top,
             "trend": {"labels": day_labels, "values": trend_values},
@@ -586,7 +587,7 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
 
         s = ContextSeekSettings()
         lc = LifecycleSettings()
-        return {
+        result: dict[str, Any] = {
             "storage_backend": s.storage.backend,
             "llm_model": s.llm.model or s.llm.provider,
             "embedding_model": s.embedding.model or s.embedding.provider,
@@ -596,6 +597,32 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
             "lifecycle_interval_seconds": lc.interval_seconds,
             "watch_paths": _parse_watch_paths(),
         }
+        backend = s.storage.backend
+        if backend == "oceanbase":
+            from contextseek.config.settings import OceanBaseSettings
+            ob = OceanBaseSettings()
+            result["ob_host"] = ob.host
+            result["ob_port"] = ob.port
+            result["ob_db_name"] = ob.db_name
+            result["ob_table_name"] = ob.table_name
+        elif backend == "seekdb":
+            from contextseek.config.settings import SeekDBSettings
+            sdb = SeekDBSettings()
+            if sdb.host:
+                result["seekdb_mode"] = "server"
+                result["seekdb_host"] = sdb.host
+                result["seekdb_port"] = str(sdb.port)
+                result["seekdb_database"] = sdb.database
+            else:
+                result["seekdb_mode"] = "embedded"
+                result["seekdb_path"] = str(Path(sdb.path).expanduser())
+        elif backend == "sqlite":
+            from contextseek.config.settings import SQLiteSettings
+            sq = SQLiteSettings()
+            result["sqlite_path"] = str(Path(sq.path).expanduser())
+        elif backend == "file":
+            result["storage_path"] = str(Path(s.storage.path).expanduser())
+        return result
 
     @app.get("/metrics")
     async def metrics() -> str:
