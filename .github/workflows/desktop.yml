@@ -4,7 +4,7 @@ on:
   # Manual trigger from the Actions tab.
   workflow_dispatch:
   # Build on PRs so reviewers can download installers from the run's artifacts.
-  # Path filter keeps unrelated PRs from triggering the 3-OS matrix.
+  # Path filter keeps unrelated PRs from triggering the desktop build matrix.
   pull_request:
     paths:
       - "desktop/**"
@@ -28,7 +28,6 @@ jobs:
         include:
           - os: ubuntu-latest
           - os: macos-latest
-          - os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +70,13 @@ jobs:
         # standalone `tauri` binary, not the `cargo-tauri` subcommand.
         run: tauri build
 
+      - name: Resolve desktop version
+        id: app_version
+        shell: bash
+        run: |
+          ver="$(python -c 'import json; print(json.load(open("desktop/tauri/src-tauri/tauri.conf.json", "r", encoding="utf-8"))["version"])')"
+          echo "value=${ver}" >> "$GITHUB_OUTPUT"
+
       # NOTE: code signing / notarization require secrets (Apple Developer ID,
       # Windows signing cert). Wire them here once provisioned, e.g. via
       # tauri-apps/tauri-action or env vars APPLE_*, WINDOWS_CERTIFICATE.
@@ -89,7 +95,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: contextseek-desktop-${{ matrix.os }}
+          name: contextseek-desktop-${{ steps.app_version.outputs.value }}-${{ matrix.os }}
           path: |
             desktop/tauri/src-tauri/target/release/bundle/**/*.AppImage
             desktop/tauri/src-tauri/target/release/bundle/**/*.deb
