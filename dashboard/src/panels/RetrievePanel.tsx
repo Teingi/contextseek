@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { usePetCompanion } from "@/context/PetCompanionContext";
 import { ctx } from "@/lib/ctxClient";
 import { useScope } from "@/context/ScopeContext";
 import { useAsyncFn } from "@/lib/utils";
@@ -15,6 +16,7 @@ import { HitCard } from "./components/HitCard";
 
 export function RetrievePanel() {
   const { scope } = useScope();
+  const { notifyPetSuccess, notifyPetError } = usePetCompanion();
   const [query, setQuery] = useState("");
   const [k, setK] = useState(10);
   const [full, setFull] = useState(false);
@@ -24,7 +26,7 @@ export function RetrievePanel() {
 
   const { data, loading, error, run } = useAsyncFn<RetrieveResponse>(ctx.retrieve);
 
-  const submit = () => {
+  const submit = async () => {
     setFilterError("");
     let filters: Record<string, unknown> | undefined;
     if (filtersText.trim()) {
@@ -35,7 +37,12 @@ export function RetrievePanel() {
         return;
       }
     }
-    run({ scope, query, k, full, include_deleted: includeDeleted, filters });
+    const result = await run({ scope, query, k, full, include_deleted: includeDeleted, filters });
+    if (result) {
+      void notifyPetSuccess("walk", { hits: result.items.length });
+    } else {
+      notifyPetError("walk");
+    }
   };
 
   return (
@@ -50,7 +57,7 @@ export function RetrievePanel() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="输入自然语言查询…"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
               }}
             />
           </div>
@@ -78,7 +85,7 @@ export function RetrievePanel() {
               />
               含已删除
             </label>
-            <AsyncButton loading={loading} onClick={submit} disabled={!query.trim()}>
+            <AsyncButton loading={loading} onClick={() => void submit()} disabled={!query.trim()}>
               <Search className="h-4 w-4" /> 检索
             </AsyncButton>
           </div>

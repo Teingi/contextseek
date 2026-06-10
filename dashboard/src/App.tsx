@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import type { PanelId } from "@/components/layout/nav";
 import { NavContext, type NavTarget } from "@/context/NavContext";
+import { PetCompanionProvider } from "@/context/PetCompanionContext";
 import { ScopeProvider } from "@/context/ScopeContext";
 import { BrowsePanel } from "@/panels/BrowsePanel";
 import { EvolutionPanel } from "@/panels/EvolutionPanel";
@@ -30,17 +31,19 @@ export function App() {
 
   return (
     <ScopeProvider>
-      <NavContext.Provider value={{ navigate, back, canGoBack: prevPanel !== null }}>
-        <div className="app-root">
-          <AppLayout activePanel={panel} onNavigate={setPanel}>
-            {panel === "retrieve" && <RetrievePanel />}
-            {panel === "browse" && <BrowsePanel />}
-            {panel === "write" && <WritePanel />}
-            {panel === "evolution" && <EvolutionPanel />}
-            {panel === "provenance" && <ProvenancePanel initialItemId={provenanceItemId} />}
-          </AppLayout>
-        </div>
-      </NavContext.Provider>
+      <PetCompanionProvider>
+        <NavContext.Provider value={{ navigate, back, canGoBack: prevPanel !== null }}>
+          <div className="app-root">
+            <AppLayout activePanel={panel} onNavigate={setPanel}>
+              {panel === "retrieve" && <RetrievePanel />}
+              {panel === "browse" && <BrowsePanel />}
+              {panel === "write" && <WritePanel />}
+              {panel === "evolution" && <EvolutionPanel />}
+              {panel === "provenance" && <ProvenancePanel initialItemId={provenanceItemId} />}
+            </AppLayout>
+          </div>
+        </NavContext.Provider>
+      </PetCompanionProvider>
     </ScopeProvider>
   );
 }

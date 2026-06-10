@@ -5,6 +5,7 @@ import { AsyncButton } from "@/components/common/AsyncButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { usePetCompanion } from "@/context/PetCompanionContext";
 import { ctx } from "@/lib/ctxClient";
 import { useScope } from "@/context/ScopeContext";
 import { errorMessage } from "@/lib/utils";
@@ -22,6 +23,7 @@ export function EvolutionPanel() {
 
 function EvolutionCard() {
   const { scope } = useScope();
+  const { notifyPetSuccess, notifyPetError } = usePetCompanion();
   const [dryRun, setDryRun] = useState(true);
   const [busy, setBusy] = useState<string>("");
   const [error, setError] = useState<unknown>(null);
@@ -32,9 +34,16 @@ function EvolutionCard() {
     setBusy("compact");
     setError(null);
     try {
-      setCompact(await ctx.compact({ scope, dry_run: dryRun }));
+      const res = await ctx.compact({ scope, dry_run: dryRun });
+      setCompact(res);
+      void notifyPetSuccess(
+        "bath",
+        { merged: res.merged, archived: res.archived, evolved: res.evolved },
+        { persist: !dryRun },
+      );
     } catch (err) {
       setError(err);
+      notifyPetError("bath");
     } finally {
       setBusy("");
     }
@@ -44,9 +53,21 @@ function EvolutionCard() {
     setBusy("dream");
     setError(null);
     try {
-      setDream(await ctx.dream({ scope, dry_run: dryRun }));
+      const res = await ctx.dream({ scope, dry_run: dryRun });
+      setDream(res);
+      void notifyPetSuccess(
+        "sleep",
+        {
+          total_dream_items: res.total_dream_items,
+          consolidation_patterns: res.consolidation_patterns,
+          consolidation_items: res.consolidation_items,
+          divergence_items: res.divergence_items,
+        },
+        { persist: !dryRun },
+      );
     } catch (err) {
       setError(err);
+      notifyPetError("sleep");
     } finally {
       setBusy("");
     }

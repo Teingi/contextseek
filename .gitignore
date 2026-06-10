@@ -16,6 +16,8 @@ venv/
 # Node / dashboard front-end
 node_modules/
 dashboard/dist/
+.vite/
+*.tsbuildinfo
 
 # Packaging / build
 build/

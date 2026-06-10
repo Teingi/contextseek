@@ -1,0 +1,632 @@
+/* ContextPet — switchable skins over ONE marmot SVG (design §6.2 V3 皮肤).
+   Each theme only re-defines the --cp-* variable contract on the two root
+   elements (.global-context-pet + .global-context-pet-card via [data-cp-theme]);
+   structure/markup stays identical. Default theme = "cyber" (赛博地穴).
+   Scoped under .global-context-pet* / .cp-* / .pet-* so the dashboard is untouched.
+   Looping motion sits behind (prefers-reduced-motion: no-preference). */
+
+/* =====================================================================
+   THEME TOKENS
+   ===================================================================== */
+:root,
+[data-cp-theme="cyber"] {
+  --cp-bg: oklch(0.13 0.028 265);
+  --cp-bg-2: oklch(0.19 0.04 265);
+  --cp-bg-3: oklch(0.25 0.05 265);
+  --cp-cyan: oklch(0.83 0.15 195);
+  --cp-magenta: oklch(0.75 0.21 322);
+  --cp-lime: oklch(0.87 0.2 135);
+  --cp-blue: oklch(0.78 0.15 245);
+  --cp-red: oklch(0.69 0.21 25);
+  --cp-amber: oklch(0.82 0.15 75);
+  --cp-ink: oklch(0.95 0.02 220);
+  --cp-dim: oklch(0.66 0.035 250);
+  --cp-edge: oklch(0.83 0.15 195 / 0.35);
+  --cp-grid: oklch(0.83 0.15 195 / 0.16);
+  --cp-accent: var(--cp-cyan);
+  --cp-on-accent: var(--cp-bg);
+  --cp-glow-color: oklch(0.83 0.15 195 / 0.28);
+  --cp-bloom: 6px;
+  --cp-aura-opacity: 0.75;
+  --cp-scan-opacity: 1;
+  --cp-grid-opacity: 1;
+  --cp-radius: 12px;
+  --cp-pet-radius: 999px;
+  --cp-body-fill: var(--cp-bg);
+  --cp-body-op: 0.5;
+  --cp-line-w: 3.4;
+  --cp-font-display: "Tourney", system-ui, sans-serif;
+  --cp-font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+  --cp-tex: repeating-linear-gradient(0deg, oklch(0 0 0 / 0.22) 0 1px, transparent 1px 3px);
+  --cp-tex-size: auto;
+  --cp-face-happy: oklch(0.86 0.16 182);
+  --cp-face-relaxed: oklch(0.83 0.15 195);
+  --cp-face-stable: oklch(0.78 0.13 218);
+  --cp-face-tired: oklch(0.8 0.13 72);
+  --cp-face-down: oklch(0.68 0.2 25);
+}
+
+/* 光感琉璃 — bright soft glass */
+[data-cp-theme="glass"] {
+  --cp-bg: oklch(0.98 0.01 250);
+  --cp-bg-2: oklch(0.96 0.02 250);
+  --cp-bg-3: oklch(1 0 0);
+  --cp-cyan: oklch(0.7 0.12 230);
+  --cp-magenta: oklch(0.66 0.16 320);
+  --cp-lime: oklch(0.74 0.14 160);
+  --cp-blue: oklch(0.7 0.13 245);
+  --cp-red: oklch(0.66 0.18 25);
+  --cp-amber: oklch(0.78 0.13 75);
+  --cp-ink: oklch(0.32 0.03 265);
+  --cp-dim: oklch(0.55 0.03 255);
+  --cp-edge: oklch(0.78 0.04 250 / 0.6);
+  --cp-grid: oklch(0.7 0.08 250 / 0.1);
+  --cp-accent: oklch(0.66 0.16 290);
+  --cp-on-accent: oklch(1 0 0);
+  --cp-glow-color: oklch(0.7 0.14 290 / 0.3);
+  --cp-bloom: 3px;
+  --cp-aura-opacity: 0.5;
+  --cp-scan-opacity: 0;
+  --cp-grid-opacity: 0;
+  --cp-radius: 22px;
+  --cp-body-fill: oklch(0.95 0.04 80);
+  --cp-body-op: 1;
+  --cp-line-w: 3;
+  --cp-tex: none;
+  --cp-face-happy: oklch(0.72 0.13 180);
+  --cp-face-relaxed: oklch(0.7 0.12 230);
+  --cp-face-stable: oklch(0.66 0.1 250);
+  --cp-face-tired: oklch(0.74 0.12 70);
+  --cp-face-down: oklch(0.66 0.16 25);
+}
+
+/* 暖土矿洞 — warm earth + headlamp */
+[data-cp-theme="burrow"] {
+  --cp-bg: oklch(0.21 0.04 58);
+  --cp-bg-2: oklch(0.26 0.05 58);
+  --cp-bg-3: oklch(0.32 0.06 60);
+  --cp-cyan: oklch(0.74 0.12 195);
+  --cp-magenta: oklch(0.7 0.13 40);
+  --cp-lime: oklch(0.74 0.13 130);
+  --cp-blue: oklch(0.7 0.1 220);
+  --cp-red: oklch(0.66 0.18 28);
+  --cp-amber: oklch(0.83 0.15 75);
+  --cp-ink: oklch(0.94 0.03 80);
+  --cp-dim: oklch(0.73 0.05 70);
+  --cp-edge: oklch(0.72 0.1 70 / 0.4);
+  --cp-grid: oklch(0.7 0.09 65 / 0.18);
+  --cp-accent: oklch(0.83 0.15 75);
+  --cp-on-accent: oklch(0.22 0.05 60);
+  --cp-glow-color: oklch(0.82 0.15 75 / 0.3);
+  --cp-bloom: 2.5px;
+  --cp-aura-opacity: 0.5;
+  --cp-scan-opacity: 0;
+  --cp-grid-opacity: 1;
+  --cp-radius: 16px;
+  --cp-body-fill: oklch(0.5 0.07 58);
+  --cp-body-op: 1;
+  --cp-line-w: 3.2;
+  --cp-tex: none;
+  --cp-face-happy: oklch(0.84 0.14 80);
+  --cp-face-relaxed: oklch(0.8 0.13 72);
+  --cp-face-stable: oklch(0.74 0.12 195);
+  --cp-face-tired: oklch(0.72 0.1 60);
+  --cp-face-down: oklch(0.66 0.18 28);
+}
+
+/* 像素掌机 — green LCD handheld */
+[data-cp-theme="pixel"] {
+  --cp-bg: oklch(0.17 0.04 150);
+  --cp-bg-2: oklch(0.21 0.05 150);
+  --cp-bg-3: oklch(0.25 0.06 150);
+  --cp-cyan: oklch(0.86 0.18 145);
+  --cp-magenta: oklch(0.78 0.15 152);
+  --cp-lime: oklch(0.88 0.2 140);
+  --cp-blue: oklch(0.82 0.16 148);
+  --cp-red: oklch(0.72 0.16 150);
+  --cp-amber: oklch(0.86 0.18 142);
+  --cp-ink: oklch(0.88 0.18 144);
+  --cp-dim: oklch(0.6 0.12 150);
+  --cp-edge: oklch(0.7 0.16 145 / 0.45);
+  --cp-grid: oklch(0.7 0.16 145 / 0.18);
+  --cp-accent: oklch(0.86 0.18 145);
+  --cp-on-accent: oklch(0.16 0.04 150);
+  --cp-glow-color: oklch(0.7 0.16 145 / 0.3);
+  --cp-bloom: 0px;
+  --cp-aura-opacity: 0.3;
+  --cp-scan-opacity: 1;
+  --cp-grid-opacity: 0;
+  --cp-radius: 10px;
+  --cp-body-fill: oklch(0.22 0.05 150);
+  --cp-body-op: 1;
+  --cp-line-w: 4;
+  --cp-font-display: "Press Start 2P", "Tourney", system-ui, sans-serif;
+  --cp-font-mono: "Press Start 2P", "JetBrains Mono", ui-monospace, monospace;
+  --cp-tex: radial-gradient(circle, oklch(0 0 0 / 0.4) 30%, transparent 34%);
+  --cp-tex-size: 4px 4px;
+  --cp-face-happy: oklch(0.88 0.2 140);
+  --cp-face-relaxed: oklch(0.86 0.18 145);
+  --cp-face-stable: oklch(0.8 0.16 148);
+  --cp-face-tired: oklch(0.74 0.14 150);
+  --cp-face-down: oklch(0.66 0.13 150);
+}
+
+/* scoped fonts helpers */
+.cp-display { font-family: var(--cp-font-display); font-optical-sizing: auto; letter-spacing: 0.03em; }
+.cp-mono { font-family: var(--cp-font-mono); font-feature-settings: "tnum" 1; }
+
+/* =====================================================================
+   AVATAR — one SVG, theme-driven outline/fill/glow
+   ===================================================================== */
+.pet-avatar {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  transform-origin: 50% 88%;
+  will-change: transform;
+  color: var(--cp-face-relaxed);
+}
+.pet-body-group { transform-origin: 50% 82%; }
+
+.pet-avatar[data-face="happy"] { color: var(--cp-face-happy); }
+.pet-avatar[data-face="relaxed"] { color: var(--cp-face-relaxed); }
+.pet-avatar[data-face="stable"] { color: var(--cp-face-stable); }
+.pet-avatar[data-face="tired"] { color: var(--cp-face-tired); }
+.pet-avatar[data-face="down"] { color: var(--cp-face-down); }
+
+.pet-avatar .cp-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--cp-line-w);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 calc(var(--cp-bloom) * 0.34) currentColor) drop-shadow(0 0 var(--cp-bloom) currentColor);
+}
+.pet-avatar .cp-line-thin {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 var(--cp-bloom) currentColor);
+}
+.pet-avatar .cp-fill-dark { fill: var(--cp-body-fill); opacity: var(--cp-body-op); }
+.pet-avatar .cp-dot { fill: currentColor; filter: drop-shadow(0 0 var(--cp-bloom) currentColor); }
+.pet-avatar .cp-ore {
+  fill: var(--cp-magenta);
+  stroke: var(--cp-magenta);
+  filter: drop-shadow(0 0 var(--cp-bloom) var(--cp-magenta)) drop-shadow(0 0 calc(var(--cp-bloom) * 1.5) var(--cp-magenta));
+}
+.pet-avatar .cp-data { fill: var(--cp-lime); filter: drop-shadow(0 0 var(--cp-bloom) var(--cp-lime)); }
+.pet-avatar .cp-drop { fill: var(--cp-blue); filter: drop-shadow(0 0 var(--cp-bloom) var(--cp-blue)); }
+.pet-avatar .cp-shard { fill: var(--cp-red); filter: drop-shadow(0 0 var(--cp-bloom) var(--cp-red)); }
+
+.pet-dirt { opacity: 0; }
+.pet-avatar[data-dirty="true"] .pet-dirt { opacity: 1; }
+.pet-lightbulb { opacity: 0; transition: opacity 0.3s ease; }
+.pet-avatar[data-inspired="true"] .pet-lightbulb { opacity: 1; }
+
+.pet-avatar[data-face="down"] { opacity: 0.9; transform: translateY(6px); }
+.pet-avatar[data-face="tired"] { transform: translateY(3px); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .pet-avatar[data-anim="idle"] .pet-body-group,
+  .pet-avatar[data-anim="refreshing"] .pet-body-group,
+  .pet-avatar[data-anim="loading_ledger"] .pet-body-group { animation: pet-breathe 3.6s ease-in-out infinite; }
+  .pet-eye { transform-origin: center; animation: pet-blink 5s ease-in-out infinite; }
+  .pet-eye.pet-eye-2 { animation-delay: 0.12s; }
+  .pet-tail { transform-origin: 78% 78%; animation: pet-wag 2.6s ease-in-out infinite; }
+
+  .pet-avatar[data-anim="feeding"] .pet-body-group { animation: pet-nibble 0.5s ease-in-out infinite; }
+  .pet-avatar[data-anim="walking"] .pet-body-group { animation: pet-hop 0.6s ease-in-out infinite; }
+  .pet-avatar[data-anim="bathing"] .pet-body-group { animation: pet-shiver 0.4s ease-in-out infinite; }
+  .pet-avatar[data-anim="sleeping"] .pet-body-group { animation: pet-breathe 5.5s ease-in-out infinite; }
+  .pet-avatar[data-anim="level_up"] { animation: pet-celebrate 0.9s ease-out 1; }
+  .pet-avatar[data-anim="error"] { animation: pet-confused 0.6s ease-in-out 2; }
+  .pet-avatar[data-anim="booting"] { animation: pet-wake 0.7s ease-out 1; }
+  .pet-avatar[data-inspired="true"] .pet-lightbulb { animation: pet-pulse 1.8s ease-in-out infinite; }
+
+  .pet-context-block { animation: pet-orbit 3s linear infinite; }
+  .pet-bubble-zzz { animation: pet-float-up 2.4s ease-in-out infinite; }
+  .pet-droplet { animation: pet-drop 0.9s ease-in infinite; }
+  .pet-spark { animation: pet-spark 0.9s ease-out 1; }
+}
+
+.pet-avatar[data-anim="sleeping"] .pet-eye,
+.pet-eye[data-closed="true"] { transform: scaleY(0.12); animation: none !important; }
+
+/* =====================================================================
+   GLOBAL COMPANION — porthole
+   ===================================================================== */
+.global-context-pet {
+  position: fixed;
+  top: 64px;
+  right: 26px;
+  z-index: 50;
+  height: 138px;
+  width: 138px;
+  pointer-events: auto;
+  /* JS sets left/top to roam across the whole screen; glide slowly between targets. */
+  transition: left 12s ease-in-out, top 12s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .global-context-pet { transition: none; }
+}
+.global-context-pet-button {
+  position: relative;
+  display: flex;
+  height: 138px;
+  width: 138px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--cp-pet-radius);
+  border: 1.5px solid var(--cp-edge);
+  background: radial-gradient(120% 120% at 50% 16%, var(--cp-bg-3) 0%, var(--cp-bg) 64%), var(--cp-bg);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--cp-accent) 18%, transparent),
+    0 18px 40px oklch(0.1 0.03 265 / 0.45),
+    0 0 26px var(--cp-glow-color),
+    inset 0 0 34px oklch(0.1 0.02 265 / 0.45);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+.global-context-pet-button:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--cp-accent) 30%, transparent),
+    0 22px 50px oklch(0.1 0.03 265 / 0.5),
+    0 0 40px var(--cp-glow-color),
+    inset 0 0 34px oklch(0.1 0.02 265 / 0.45);
+}
+
+/* grid horizon (::before) + texture/scanlines (::after) */
+.global-context-pet-button::before {
+  content: "";
+  position: absolute;
+  inset: 50% -12% -14% -12%;
+  opacity: var(--cp-grid-opacity);
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 13px, var(--cp-grid) 13px 14px),
+    repeating-linear-gradient(0deg, transparent 0 11px, var(--cp-grid) 11px 12px);
+  transform: perspective(120px) rotateX(60deg);
+  transform-origin: top center;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 45%);
+  mask-image: linear-gradient(to bottom, transparent, black 45%);
+  pointer-events: none;
+}
+.global-context-pet-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--cp-tex);
+  background-size: var(--cp-tex-size);
+  opacity: var(--cp-scan-opacity);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.global-context-pet-aura {
+  position: absolute;
+  inset: 16px;
+  border-radius: 999px;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    color-mix(in oklch, var(--cp-cyan) 60%, transparent),
+    color-mix(in oklch, var(--cp-magenta) 55%, transparent),
+    color-mix(in oklch, var(--cp-lime) 50%, transparent),
+    transparent
+  );
+  filter: blur(9px);
+  opacity: var(--cp-aura-opacity);
+}
+.global-context-pet-ground {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 28px oklch(0.05 0.02 265 / 0.55);
+  background: radial-gradient(78% 56% at 50% 30%, var(--cp-glow-color), transparent 70%);
+  pointer-events: none;
+}
+.global-context-pet-orbit { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.global-context-pet-orbit span {
+  position: absolute;
+  left: 50%; top: 50%;
+  height: 5px; width: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 999px;
+  background: var(--cp-cyan);
+  box-shadow: 0 0 8px var(--cp-cyan);
+}
+.global-context-pet-orbit span:nth-child(2) { background: var(--cp-magenta); box-shadow: 0 0 8px var(--cp-magenta); }
+.global-context-pet-orbit span:nth-child(3) { background: var(--cp-lime); box-shadow: 0 0 8px var(--cp-lime); }
+
+.global-context-pet .pet-avatar { position: relative; z-index: 2; height: 110px; width: 110px; }
+
+.global-context-pet-xp {
+  position: absolute;
+  left: 50%; top: 8px;
+  z-index: 4;
+  transform: translateX(-50%);
+  color: var(--cp-lime);
+  font-family: var(--cp-font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-shadow: 0 0 8px var(--cp-lime);
+}
+
+.global-context-pet-bubble {
+  position: absolute;
+  right: 122px; top: 14px;
+  z-index: 4;
+  width: max-content;
+  max-width: 230px;
+  border-radius: 6px;
+  border: 1px solid var(--cp-edge);
+  background: color-mix(in oklch, var(--cp-bg) 92%, transparent);
+  padding: 7px 11px;
+  font-family: var(--cp-font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--cp-ink);
+  box-shadow: 0 0 18px var(--cp-glow-color);
+  pointer-events: none;
+}
+.global-context-pet-bubble::before { content: "> "; color: var(--cp-accent); }
+.global-context-pet-bubble::after {
+  content: "";
+  position: absolute;
+  right: -5px; top: 15px;
+  height: 8px; width: 8px;
+  transform: rotate(45deg);
+  background: color-mix(in oklch, var(--cp-bg) 92%, transparent);
+  border-right: 1px solid var(--cp-edge);
+  border-top: 1px solid var(--cp-edge);
+}
+/* when the pet sits on the left half of the screen, flip the bubble to its right */
+.global-context-pet[data-side="right"] .global-context-pet-bubble { left: 122px; right: auto; }
+.global-context-pet[data-side="right"] .global-context-pet-bubble::after {
+  left: -5px; right: auto;
+  transform: rotate(225deg);
+}
+
+/* =====================================================================
+   EXPANDED CARD
+   ===================================================================== */
+.global-context-pet-card {
+  position: fixed;
+  right: 26px; top: 214px;
+  z-index: 51;
+  width: 336px;
+  max-height: min(74vh, 600px);
+  overflow: auto;
+  border-radius: var(--cp-radius);
+  border: 1px solid var(--cp-edge);
+  background: linear-gradient(180deg, var(--cp-bg-2), var(--cp-bg)), var(--cp-bg);
+  padding: 16px;
+  color: var(--cp-ink);
+  box-shadow:
+    0 24px 60px oklch(0.08 0.02 265 / 0.5),
+    0 0 30px var(--cp-glow-color),
+    inset 0 0 40px oklch(0.1 0.02 265 / 0.25);
+  scrollbar-width: thin;
+  scrollbar-color: var(--cp-edge) transparent;
+}
+.global-context-pet-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--cp-tex);
+  background-size: var(--cp-tex-size);
+  opacity: calc(var(--cp-scan-opacity) * 0.6);
+  mix-blend-mode: overlay;
+}
+
+.global-context-pet-card-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--cp-edge);
+}
+.cp-wordmark {
+  font-family: var(--cp-font-display);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  color: var(--cp-ink);
+  text-shadow: 0 0 10px var(--cp-glow-color);
+}
+.cp-wordmark .cp-slash { color: var(--cp-magenta); }
+.cp-subtitle { font-family: var(--cp-font-mono); font-size: 10px; color: var(--cp-dim); letter-spacing: 0.02em; margin-top: 4px; }
+.cp-hero-right { display: flex; align-items: center; gap: 8px; }
+.global-context-pet-level {
+  font-family: var(--cp-font-display);
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--cp-accent);
+  text-shadow: 0 0 12px var(--cp-glow-color);
+  padding: 6px 10px;
+  border: 1px solid var(--cp-edge);
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--cp-accent) 8%, transparent);
+}
+.cp-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  width: 28px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  border: 1px solid var(--cp-edge);
+  background: color-mix(in oklch, var(--cp-accent) 6%, transparent);
+  color: var(--cp-ink);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.cp-close:hover { background: var(--cp-accent); color: var(--cp-on-accent); }
+
+/* theme switch */
+.cp-theme-switch {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 3px;
+  border: 1px solid var(--cp-edge);
+  border-radius: 9px;
+  background: color-mix(in oklch, var(--cp-accent) 5%, transparent);
+}
+.cp-theme-btn {
+  flex: 1;
+  font-family: var(--cp-font-mono);
+  font-size: 10px;
+  line-height: 1.3;
+  padding: 6px 2px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cp-dim);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.cp-theme-btn:hover { color: var(--cp-ink); }
+.cp-theme-btn[data-on="true"] {
+  color: var(--cp-on-accent);
+  background: var(--cp-accent);
+  box-shadow: 0 0 10px var(--cp-glow-color);
+  font-weight: 600;
+}
+
+.cp-section-label {
+  font-family: var(--cp-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cp-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+/* vitals gauges */
+.cp-vital-row { display: flex; flex-direction: column; gap: 5px; }
+.cp-vital-row + .cp-vital-row { margin-top: 10px; }
+.cp-vital-head { display: flex; align-items: baseline; justify-content: space-between; font-size: 11px; }
+.cp-vital-name { color: var(--cp-ink); }
+.cp-vital-code { font-family: var(--cp-font-mono); font-size: 9px; letter-spacing: 0.12em; color: var(--cp-dim); margin-left: 6px; }
+.cp-vital-val { font-family: var(--cp-font-mono); font-weight: 700; color: var(--cp-c, var(--cp-cyan)); text-shadow: 0 0 8px color-mix(in oklch, var(--cp-c, var(--cp-cyan)) 55%, transparent); }
+.cp-meter {
+  position: relative;
+  height: 9px;
+  border-radius: 3px;
+  background: oklch(0.1 0.02 265 / 0.4);
+  border: 1px solid var(--cp-edge);
+  overflow: hidden;
+}
+.cp-meter-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, color-mix(in oklch, var(--cp-c) 50%, transparent), var(--cp-c));
+  box-shadow: 0 0 10px var(--cp-c);
+  transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cp-meter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 7px, oklch(0.1 0.02 265 / 0.55) 7px 8px);
+  pointer-events: none;
+}
+.cp-empty { font-family: var(--cp-font-mono); font-size: 11px; color: var(--cp-dim); }
+
+/* growth */
+.cp-growth-top { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 8px; }
+.cp-xp { font-family: var(--cp-font-mono); font-size: 11px; color: var(--cp-dim); }
+.cp-streak { display: inline-flex; align-items: center; gap: 4px; font-family: var(--cp-font-mono); font-size: 11px; color: var(--cp-amber); text-shadow: 0 0 8px color-mix(in oklch, var(--cp-amber) 50%, transparent); }
+.cp-xpbar { height: 6px; border-radius: 3px; background: oklch(0.1 0.02 265 / 0.4); border: 1px solid var(--cp-edge); overflow: hidden; }
+.cp-xpbar-fill { height: 100%; background: linear-gradient(90deg, var(--cp-lime), var(--cp-accent)); box-shadow: 0 0 10px var(--cp-glow-color); transition: width 0.6s ease; }
+.cp-next { font-family: var(--cp-font-mono); font-size: 10px; color: var(--cp-dim); margin-top: 6px; }
+.cp-counters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 10px; }
+.cp-counter { border: 1px solid var(--cp-edge); border-radius: 7px; padding: 7px 4px; text-align: center; background: color-mix(in oklch, var(--cp-accent) 4%, transparent); }
+.cp-counter-val { font-family: var(--cp-font-mono); font-weight: 700; font-size: 16px; color: var(--cp-ink); }
+.cp-counter-label { font-size: 10px; color: var(--cp-dim); margin-top: 1px; }
+
+/* achievements — ore chips */
+.cp-ores { display: flex; flex-wrap: wrap; gap: 6px; }
+.cp-ore { font-family: var(--cp-font-mono); font-size: 10px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--cp-edge); color: var(--cp-dim); background: transparent; }
+.cp-ore[data-on="true"] { color: var(--cp-on-accent); border-color: var(--cp-magenta); background: var(--cp-magenta); box-shadow: 0 0 10px color-mix(in oklch, var(--cp-magenta) 55%, transparent); font-weight: 600; }
+
+/* timeline — dig log */
+.cp-log { display: flex; flex-direction: column; gap: 7px; }
+.cp-log-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: var(--cp-font-mono); font-size: 11px; }
+.cp-tag { padding: 1px 6px; border-radius: 4px; font-size: 10px; border: 1px solid currentColor; }
+.cp-tag[data-action="feed"] { color: var(--cp-lime); }
+.cp-tag[data-action="walk"] { color: var(--cp-cyan); }
+.cp-tag[data-action="bath"] { color: var(--cp-blue); }
+.cp-tag[data-action="sleep"] { color: var(--cp-magenta); }
+.cp-log-xp { color: var(--cp-lime); }
+.cp-log-scope { color: var(--cp-dim); }
+.cp-log-time { color: var(--cp-dim); white-space: nowrap; }
+
+.cp-stack > * + * { margin-top: 16px; }
+
+/* =====================================================================
+   MOTION
+   ===================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+  .global-context-pet-button::after { animation: cp-flicker 4s steps(2) infinite; }
+  .global-context-pet-aura { animation: cp-aura-spin 6s linear infinite; }
+  .global-context-pet-xp { animation: pet-float-up 1.2s ease-out forwards; }
+  .global-context-pet-bubble { animation: cp-bubble-pop 0.3s ease-out; }
+
+  .global-context-pet-orbit span:nth-child(1) { animation: cp-particle 4.8s linear infinite; }
+  .global-context-pet-orbit span:nth-child(2) { animation: cp-particle 6s linear infinite reverse; }
+  .global-context-pet-orbit span:nth-child(3) { animation: cp-particle 7.6s ease-in-out infinite; }
+
+  .global-context-pet[data-anim="level_up"] .global-context-pet-button { animation: cp-surge 0.9s ease-out 1; }
+  .global-context-pet[data-anim="error"] .global-context-pet-button { animation: cp-glitch-shake 0.3s ease-in-out 3; }
+}
+
+/* ---- keyframes ---- */
+@keyframes pet-breathe { 0%,100% { transform: translateY(0) scaleY(1); } 50% { transform: translateY(-3px) scaleY(1.03); } }
+@keyframes pet-blink { 0%,92%,100% { transform: scaleY(1); } 95% { transform: scaleY(0.12); } }
+@keyframes pet-wag { 0%,100% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
+@keyframes pet-nibble { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px) scale(1.02); } }
+@keyframes pet-hop { 0%,100% { transform: translateY(0) translateX(0); } 25% { transform: translateY(-10px) translateX(-4px); } 75% { transform: translateY(-10px) translateX(4px); } }
+@keyframes pet-shiver { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
+@keyframes pet-wake { 0% { transform: translateY(40px) scale(0.9); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+@keyframes pet-celebrate { 0% { transform: translateY(0) scale(1); } 30% { transform: translateY(-16px) scale(1.08); } 60% { transform: translateY(0) scale(1); } 80% { transform: translateY(-7px) scale(1.04); } 100% { transform: translateY(0) scale(1); } }
+@keyframes pet-confused { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+@keyframes pet-float-up { 0% { transform: translate(-50%, 0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(-50%, -42px); opacity: 0; } }
+@keyframes pet-orbit { 0% { transform: rotate(0deg) translateX(64px) rotate(0deg); } 100% { transform: rotate(360deg) translateX(64px) rotate(-360deg); } }
+@keyframes pet-drop { 0% { transform: translateY(-10px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(28px); opacity: 0; } }
+@keyframes pet-spark { 0% { transform: scale(0); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+@keyframes pet-pulse { 0%,100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.12); } }
+@keyframes cp-flicker { 0%,100% { opacity: var(--cp-scan-opacity); } 50% { opacity: calc(var(--cp-scan-opacity) * 0.5); } }
+@keyframes cp-aura-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes cp-particle { 0% { transform: rotate(0deg) translateX(56px) rotate(0deg); } 100% { transform: rotate(360deg) translateX(56px) rotate(-360deg); } }
+@keyframes cp-bubble-pop { 0% { transform: translateX(8px) scale(0.94); opacity: 0; } 100% { transform: translateX(0) scale(1); opacity: 1; } }
+@keyframes cp-surge { 0% { box-shadow: 0 0 26px var(--cp-glow-color); } 40% { box-shadow: 0 0 0 2px var(--cp-lime), 0 0 48px var(--cp-glow-color); } 100% { box-shadow: 0 0 26px var(--cp-glow-color); } }
+@keyframes cp-glitch-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+/* =====================================================================
+   RESPONSIVE
+   ===================================================================== */
+@media (max-width: 900px) {
+  .global-context-pet { top: auto; right: 16px; bottom: 16px; }
+  .global-context-pet-bubble { bottom: 122px; right: 0; top: auto; }
+  .global-context-pet-bubble::after { top: auto; bottom: -5px; transform: rotate(135deg); }
+  .global-context-pet-card { bottom: 150px; top: auto; right: 16px; width: min(336px, calc(100vw - 32px)); }
+}

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useNav } from "@/context/NavContext";
+import { usePetCompanion } from "@/context/PetCompanionContext";
 import { ctx } from "@/lib/ctxClient";
 import { useScope } from "@/context/ScopeContext";
 import { errorMessage } from "@/lib/utils";
@@ -17,6 +18,7 @@ import type { AddResponse } from "@/lib/types";
 export function WritePanel() {
   const { scope } = useScope();
   const { navigate } = useNav();
+  const { notifyPetSuccess, notifyPetError } = usePetCompanion();
   const [content, setContent] = useState("");
   const [asJson, setAsJson] = useState(false);
   const [source, setSource] = useState("api");
@@ -49,10 +51,12 @@ export function WritePanel() {
           .filter(Boolean),
       });
       setResult(res);
+      void notifyPetSuccess("feed", { id: res.id });
       setContent("");
       setTags("");
     } catch (err) {
       setError(err);
+      notifyPetError("feed");
     } finally {
       setLoading(false);
     }
