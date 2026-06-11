@@ -20,4 +20,3 @@ class CodexNormalizer:
             partition=partition,
             source_type="chat_trace",
         )
-

@@ -96,4 +96,3 @@ class JsonFileConnectorConfigStore(ConnectorConfigStore):
             rows = self._read()
             rows.pop(connector_id, None)
             self._write(rows)
-

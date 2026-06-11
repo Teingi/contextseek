@@ -74,12 +74,18 @@ class InMemoryDeadLetterStore(DeadLetterStore):
         with self._lock:
             if connector_id is None:
                 return list(self._records)
-            return [record for record in self._records if record.connector_id == connector_id]
+            return [
+                record
+                for record in self._records
+                if record.connector_id == connector_id
+            ]
 
     def delete(self, record_id: str) -> bool:
         with self._lock:
             before = len(self._records)
-            self._records = [record for record in self._records if record.id != record_id]
+            self._records = [
+                record for record in self._records if record.id != record_id
+            ]
             return len(self._records) < before
 
 
@@ -150,4 +156,3 @@ class JsonlDeadLetterStore(DeadLetterStore):
                 content += "\n"
             atomic_write_text(self._path, content)
             return True
-

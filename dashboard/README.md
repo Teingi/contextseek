@@ -3,7 +3,7 @@
 一个内置的 Web 控制台，用于管理 ContextSeek 的语义记忆。包含 5 个面板：
 
 - **检索 (Retrieve)** — 语义检索 + 展开全文
-- **浏览 (Browse)** — 按 scope / 阶段浏览记忆，支持反馈 / forget / delete
+- **透视 (Insight)** — 按 scope / 阶段透视记忆，支持反馈 / forget / delete
 - **写入 (Write)** — 写入一条上下文
 - **演化 / 生命周期 (Evolution)** — compact / dream / 反馈 / 删除
 - **溯源图谱 (Provenance)** — 证据链 DAG 与派生回溯

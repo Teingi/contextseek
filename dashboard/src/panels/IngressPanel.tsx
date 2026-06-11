@@ -259,7 +259,7 @@ export function IngressPanel() {
           </SectionCard>
         </div>
 
-        {/* Column 2: watch paths + throughput chart + contribution */}
+        {/* Column 2: watch paths + contribution */}
         <div className="space-y-4">
           <SectionCard title={t("ingress.watchPaths")}>
             {watchPathRows.length > 0 ? (
@@ -269,10 +269,6 @@ export function IngressPanel() {
                 {t("ingress.watchPaths.empty")}
               </p>
             )}
-          </SectionCard>
-
-          <SectionCard title={t("ingress.throughput")}>
-            <LineChart labels={throughput.labels} values={throughput.values} color="#54b6ff" />
           </SectionCard>
 
           <SectionCard title={t("ingress.contribution")}>

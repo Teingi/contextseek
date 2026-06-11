@@ -25,4 +25,3 @@ def atomic_write_text(path: Path, content: str, *, encoding: str = "utf-8") -> N
     finally:
         if tmp_path.exists():
             tmp_path.unlink(missing_ok=True)
-

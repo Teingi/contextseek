@@ -85,4 +85,3 @@ class JsonFileCheckpointStore:
                 if key.startswith(prefix):
                     result.append(SyncCheckpoint(**payload))
             return result
-

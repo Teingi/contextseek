@@ -78,9 +78,9 @@ The config location can be overridden with the `CONTEXTSEEK_CONFIG` environment 
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `STORAGE_BACKEND` | `seekdb` | Embedded by default; can switch to `oceanbase` / `file` |
+| `STORAGE_BACKEND` | `seekdb` | Use `seekdb` for embedded mode; use `oceanbase` for seekdb server mode |
 | `SEEKDB_PATH` | `~/.contextseek/seekdb.db` | Embedded data file |
-| `SEEKDB_HOST` / `SEEKDB_PORT` | — | Uncomment to switch to seekdb server mode |
+| `SEEKDB_HOST` / `SEEKDB_PORT` | — | Uncomment to switch to seekdb server mode; only server mode uses `STORAGE_BACKEND=oceanbase` |
 | `DEFAULT_SCOPE` | `me/work` | Scope used when `--scope` is omitted |
 | `EVOLUTION_ENABLED` | `true` | Whether auto-evolution runs |
 | `LIFECYCLE_INTERVAL_SECONDS` | `3600` | Daemon auto-evolution period (seconds) |

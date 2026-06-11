@@ -238,7 +238,9 @@ def test_connector_config_store_restore_on_restart(tmp_path) -> None:
         writer=IngestionWriter(ContextSeek()),
         checkpoint_store=InMemoryCheckpointStore(),
     )
-    control2 = IngestionControlPlane(runtime2, config_store=store, restore_on_startup=True)
+    control2 = IngestionControlPlane(
+        runtime2, config_store=store, restore_on_startup=True
+    )
     restored = control2.list_connectors()
     assert len(restored) == 1
     assert restored[0]["connector_id"] == "notes-main"
@@ -429,4 +431,3 @@ def test_dead_letter_replay_all_with_cleanup() -> None:
     assert result["remove_after_replay"] is True
     assert result["replayed_count"] == 2
     assert control.dead_letters("notes-main") == []
-

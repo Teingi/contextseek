@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
-import { DonutChart } from "@/components/charts/DonutChart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,33 +14,6 @@ import { useScope } from "@/context/ScopeContext";
 import { ctx } from "@/lib/ctxClient";
 import { useI18n } from "@/lib/i18n";
 import type { ContextItem } from "@/lib/types";
-
-const TYPE_COLORS: Record<string, string> = {
-  prompt: "#54b6ff",
-  tool: "#6ed18f",
-  mcp: "#b694ff",
-};
-
-const TYPE_VARIANT = {
-  prompt: "default",
-  tool: "secondary",
-  mcp: "outline",
-} as const;
-
-const KNOWN_TYPES = ["prompt", "tool", "mcp"] as const;
-type SkillType = (typeof KNOWN_TYPES)[number];
-
-function detectType(item: ContextItem): SkillType {
-  if (item.content && typeof item.content === "object") {
-    const st = (item.content as Record<string, unknown>).skill_type;
-    if (st === "tool" || st === "mcp" || st === "prompt") return st;
-  }
-  // fallback: derive from tags (tags use "tool_skill" / "mcp_skill" convention)
-  const tags = item.tags ?? [];
-  if (tags.some((t) => t.includes("tool"))) return "tool";
-  if (tags.some((t) => t.includes("mcp"))) return "mcp";
-  return "prompt";
-}
 
 function triggerDownload(filename: string, content: string, mimeType = "application/json") {
   const blob = new Blob([content], { type: mimeType });
@@ -125,8 +97,6 @@ function SkillDetailDialog({
   const { t } = useI18n();
   if (!item) return null;
 
-  const type = detectType(item);
-
   // Handle both string-content and dict-content skills
   const isStringContent = typeof item.content === "string";
   const dictContent =
@@ -162,11 +132,8 @@ function SkillDetailDialog({
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b shrink-0">
           <DialogHeader>
-            <DialogTitle className="flex items-start gap-2 pr-6">
-              <Badge variant={TYPE_VARIANT[type]} className="mt-0.5 shrink-0">
-                {type}
-              </Badge>
-              <span className="leading-snug">{name}</span>
+            <DialogTitle className="leading-snug pr-6">
+              {name}
             </DialogTitle>
           </DialogHeader>
           {description && !isStringContent && (
@@ -271,8 +238,7 @@ function SystemPromptCard({ items }: { items: ContextItem[] }) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const promptSkills = items.filter((item) => detectType(item) === "prompt");
-  const fullPrompt = buildSystemPrompt(promptSkills);
+  const fullPrompt = buildSystemPrompt(items);
 
   function handleCopyAll() {
     if (!fullPrompt) return;
@@ -285,10 +251,10 @@ function SystemPromptCard({ items }: { items: ContextItem[] }) {
 
   return (
     <SectionCard
-      title={`${t("skills.systemPrompt")}${promptSkills.length > 0 ? ` (${promptSkills.length})` : ""}`}
+      title={`${t("skills.systemPrompt")}${items.length > 0 ? ` (${items.length})` : ""}`}
       hint={t("skills.systemPrompt.hint")}
     >
-      {promptSkills.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-xs text-muted-foreground">{t("skills.systemPrompt.empty")}</p>
       ) : (
         <div className="space-y-3">
@@ -302,7 +268,7 @@ function SystemPromptCard({ items }: { items: ContextItem[] }) {
           </div>
 
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{promptSkills.length} 个技能 · 复制后粘贴进 LLM system prompt 即可生效</span>
+            <span>{items.length} 个技能 · 复制后粘贴进 LLM system prompt 即可生效</span>
             <Button
               size="sm"
               variant="secondary"
@@ -324,8 +290,6 @@ export function SkillsPanel() {
   const [items, setItems] = useState<ContextItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<ContextItem | null>(null);
-  const [downloadingOpenai, setDownloadingOpenai] = useState(false);
-  const [downloadingMcp, setDownloadingMcp] = useState(false);
   const [downloadingMd, setDownloadingMd] = useState(false);
 
   useEffect(() => {
@@ -346,26 +310,6 @@ export function SkillsPanel() {
       cancelled = true;
     };
   }, [scope]);
-
-  async function handleDownloadOpenai() {
-    setDownloadingOpenai(true);
-    try {
-      const res = await ctx.skillTools({ scope, fmt: "openai" });
-      triggerDownload("skills-openai.json", JSON.stringify(res.tools, null, 2));
-    } finally {
-      setDownloadingOpenai(false);
-    }
-  }
-
-  async function handleDownloadMcp() {
-    setDownloadingMcp(true);
-    try {
-      const res = await ctx.skillTools({ scope, fmt: "mcp" });
-      triggerDownload("skills-mcp.json", JSON.stringify(res.tools, null, 2));
-    } finally {
-      setDownloadingMcp(false);
-    }
-  }
 
   async function handleDownloadSkillMd() {
     setDownloadingMd(true);
@@ -393,90 +337,30 @@ export function SkillsPanel() {
     );
   }
 
-  // Count by type
-  const typeCounts: Record<SkillType, number> = { prompt: 0, tool: 0, mcp: 0 };
-  for (const item of items) {
-    typeCounts[detectType(item)] += 1;
-  }
-
-  const total = items.length || 1;
-  const typeDonut = KNOWN_TYPES.filter((t) => typeCounts[t] > 0).map((t) => ({
-    label: t,
-    value: typeCounts[t],
-    color: TYPE_COLORS[t],
-  }));
-
-  const recent = [...items].reverse().slice(0, 5);
-
+  const recent = [...items].reverse().slice(0, 8);
   const hasSkills = items.length > 0;
-  const hasToolSkills = typeCounts.tool + typeCounts.mcp > 0;
 
   return (
     <div className="space-y-4 p-6">
       <SkillDetailDialog item={selectedItem} onClose={() => setSelectedItem(null)} />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Column 1: Type distribution (merged donut + counts) */}
-        <div className="space-y-4">
-          <SectionCard title={t("skills.type")}>
-            {items.length > 0 ? (
-              <div className="space-y-3">
-                {/* Donut ring */}
-                <DonutChart segments={typeDonut} />
-                {/* Per-type rows with count + bar + percent */}
-                <div className="space-y-1.5 pt-1 border-t">
-                  {KNOWN_TYPES.map((type) => {
-                    const count = typeCounts[type];
-                    const pct = Math.round((count / total) * 100);
-                    return (
-                      <div key={type} className="flex items-center gap-2 text-xs">
-                        <span
-                          className="h-2 w-2 rounded-sm shrink-0"
-                          style={{ background: TYPE_COLORS[type] }}
-                        />
-                        <span className="text-muted-foreground w-12 shrink-0">{type}</span>
-                        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{ width: `${pct}%`, background: TYPE_COLORS[type] }}
-                          />
-                        </div>
-                        <span className="tabular-nums text-right w-12 text-muted-foreground">
-                          {count} <span className="opacity-60">({pct}%)</span>
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                {t("overview.noData") || "No skills yet"}
-              </p>
-            )}
-          </SectionCard>
-        </div>
-
-        {/* Column 2: Recent distilled skills (clickable) */}
-        <div className="space-y-4">
+        {/* Skills list */}
+        <div className="space-y-4 lg:col-span-2">
           <SectionCard title={t("skills.distilled")}>
             {recent.length > 0 ? (
               <div className="space-y-1">
-                {recent.map((item) => {
-                  const type = detectType(item);
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setSelectedItem(item)}
-                      className="w-full flex items-center justify-between rounded px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors cursor-pointer"
-                    >
-                      <span className="truncate flex-1 mr-2">
-                        {item.summary ?? item.id}
-                      </span>
-                      <Badge variant={TYPE_VARIANT[type]}>{type}</Badge>
-                    </button>
-                  );
-                })}
+                {recent.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setSelectedItem(item)}
+                    className="w-full flex items-center rounded px-2 py-1.5 text-left text-xs hover:bg-muted transition-colors cursor-pointer"
+                  >
+                    <span className="truncate flex-1">
+                      {item.summary ?? item.id}
+                    </span>
+                  </button>
+                ))}
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
@@ -486,64 +370,22 @@ export function SkillsPanel() {
           </SectionCard>
         </div>
 
-        {/* Column 3: Export formats */}
+        {/* SKILL.md export */}
         <div className="space-y-4">
-          <SectionCard title={t("skills.export")}>
-            <div className="space-y-3">
-              {/* SKILL.md */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono">SKILL.md</span>
-                  <Badge variant="secondary" className="text-xs">
-                    {hasSkills ? `${typeCounts.prompt}` : "—"}
-                  </Badge>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!hasSkills || downloadingMd}
-                  onClick={handleDownloadSkillMd}
-                  className="h-6 text-xs px-2"
-                >
-                  {t("skills.export.download")}
-                </Button>
-              </div>
-              {/* OpenAI Tool JSON */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono">OpenAI JSON</span>
-                  <Badge variant="secondary" className="text-xs">
-                    {hasToolSkills ? `${typeCounts.tool + typeCounts.mcp}` : "—"}
-                  </Badge>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!hasToolSkills || downloadingOpenai}
-                  onClick={handleDownloadOpenai}
-                  className="h-6 text-xs px-2"
-                >
-                  {t("skills.export.download")}
-                </Button>
-              </div>
-              {/* MCP Tool JSON */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono">MCP JSON</span>
-                  <Badge variant="secondary" className="text-xs">
-                    {typeCounts.mcp > 0 ? `${typeCounts.mcp}` : "—"}
-                  </Badge>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={typeCounts.mcp === 0 || downloadingMcp}
-                  onClick={handleDownloadMcp}
-                  className="h-6 text-xs px-2"
-                >
-                  {t("skills.export.download")}
-                </Button>
-              </div>
+          <SectionCard title="SKILL.md">
+            <div className="flex flex-col gap-3">
+              <p className="text-xs text-muted-foreground">
+                复制后粘贴进 LLM system prompt 即可生效
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!hasSkills || downloadingMd}
+                onClick={handleDownloadSkillMd}
+                className="w-full text-xs"
+              >
+                {t("skills.export.download")}
+              </Button>
             </div>
           </SectionCard>
         </div>

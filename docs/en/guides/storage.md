@@ -109,6 +109,8 @@ Writes always go to the hot tier. `compact()` moves archived items (ephemeral TT
 |---|---|
 | Unit tests / CI | `InMemoryBackend` |
 | Local dev, single process | `FileBackend` |
+| seekdb embedded mode | `STORAGE_BACKEND=seekdb`|
+| seekdb server mode | `STORAGE_BACKEND=oceanbase` |
 | Semantic / vector search | OceanBase |
 | Production multi-process | OceanBase |
 | Long-term archival | Tiered (File + File, or OceanBase + File) |

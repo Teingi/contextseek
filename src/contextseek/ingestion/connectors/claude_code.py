@@ -28,9 +28,13 @@ class ClaudeCodeConnector(BaseConnector):
         return [str(session)] if session else ["default"]
 
     def pull(self, partition: str, checkpoint: SyncCheckpoint | None) -> PullResult:
-        transcript = Path(str(self.config.config.get("transcript_path", ""))).expanduser()
+        transcript = Path(
+            str(self.config.config.get("transcript_path", ""))
+        ).expanduser()
         if not transcript.exists():
-            return PullResult(payloads=[], next_cursor=checkpoint.cursor if checkpoint else "")
+            return PullResult(
+                payloads=[], next_cursor=checkpoint.cursor if checkpoint else ""
+            )
 
         offset = _offset_cursor(checkpoint.cursor if checkpoint else "")
         payloads: list[dict[str, Any]] = []
@@ -69,4 +73,3 @@ class ClaudeCodeConnector(BaseConnector):
                 )
             next_cursor = f"offset:{fh.tell()}"
         return PullResult(payloads=payloads, next_cursor=next_cursor, has_more=False)
-

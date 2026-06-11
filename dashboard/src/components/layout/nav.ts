@@ -1,12 +1,11 @@
 import {
+  Eye,
   GitGraph,
   LayoutDashboard,
-  Plug,
   PlusCircle,
   Search,
   Settings,
   Sparkles,
-  Table2,
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -18,7 +17,6 @@ export type PanelId =
   | "write"
   | "evolution"
   | "provenance"
-  | "ingress"
   | "skills"
   | "settings";
 
@@ -32,11 +30,10 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { id: "overview", icon: LayoutDashboard },
   { id: "retrieve", icon: Search },
-  { id: "browse", icon: Table2 },
+  { id: "browse", icon: Eye },
   { id: "write", icon: PlusCircle },
   { id: "evolution", icon: Sparkles },
   { id: "provenance", icon: GitGraph },
-  { id: "ingress", icon: Plug },
   { id: "skills", icon: Zap },
   { id: "settings", icon: Settings },
 ];

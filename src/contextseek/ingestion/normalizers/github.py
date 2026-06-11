@@ -20,4 +20,3 @@ class GitHubNormalizer:
             partition=partition,
             source_type="url_doc",
         )
-

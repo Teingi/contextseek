@@ -59,13 +59,17 @@ class UrlConnector(BaseConnector):
                 etag = str(resp.headers.get("ETag", "")).strip()
                 last_modified = str(resp.headers.get("Last-Modified", "")).strip()
         except Exception:
-            return PullResult(payloads=[], next_cursor=checkpoint.cursor if checkpoint else "")
+            return PullResult(
+                payloads=[], next_cursor=checkpoint.cursor if checkpoint else ""
+            )
 
         parser = _SimpleHTMLText()
         parser.feed(body)
         content = "\n".join(parser.parts).strip()
         if not content:
-            return PullResult(payloads=[], next_cursor=checkpoint.cursor if checkpoint else "")
+            return PullResult(
+                payloads=[], next_cursor=checkpoint.cursor if checkpoint else ""
+            )
 
         updated_at = datetime.now(timezone.utc).timestamp()
         cursor_parts = []
@@ -89,4 +93,3 @@ class UrlConnector(BaseConnector):
             },
         }
         return PullResult(payloads=[payload], next_cursor=next_cursor, has_more=False)
-

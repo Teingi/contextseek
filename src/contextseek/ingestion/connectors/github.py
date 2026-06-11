@@ -34,7 +34,11 @@ def _iso_to_epoch(value: str) -> float:
 def _epoch_to_iso(epoch: float) -> str:
     if epoch <= 0:
         return ""
-    return datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.fromtimestamp(epoch, tz=timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 class GitHubConnector(BaseConnector):
@@ -50,7 +54,9 @@ class GitHubConnector(BaseConnector):
     def pull(self, partition: str, checkpoint: SyncCheckpoint | None) -> PullResult:
         token = str(self.config.config.get("token", ""))
         if not partition:
-            return PullResult(payloads=[], next_cursor=checkpoint.cursor if checkpoint else "")
+            return PullResult(
+                payloads=[], next_cursor=checkpoint.cursor if checkpoint else ""
+            )
 
         per_page = int(self.config.config.get("per_page", 100))
         page = int(self.config.config.get("page", 1))
@@ -126,4 +132,3 @@ class GitHubConnector(BaseConnector):
             else (checkpoint.cursor if checkpoint else "")
         )
         return PullResult(payloads=payloads, next_cursor=next_cursor, has_more=False)
-

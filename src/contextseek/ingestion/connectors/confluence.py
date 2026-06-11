@@ -48,7 +48,9 @@ class ConfluenceConnector(BaseConnector):
         base_url = str(self.config.config.get("base_url", "")).rstrip("/")
         token = str(self.config.config.get("token", ""))
         if not base_url or not token:
-            return PullResult(payloads=[], next_cursor=checkpoint.cursor if checkpoint else "")
+            return PullResult(
+                payloads=[], next_cursor=checkpoint.cursor if checkpoint else ""
+            )
 
         limit = int(self.config.config.get("limit", 50))
         since_epoch = _cursor_to_epoch(checkpoint.cursor if checkpoint else "")
@@ -78,7 +80,9 @@ class ConfluenceConnector(BaseConnector):
                     data = json.loads(resp.read().decode("utf-8", errors="replace"))
             except HTTPError as exc:
                 if exc.code in {429, 500, 502, 503, 504}:
-                    raise RetryableError(f"confluence temporary error: {exc.code}") from exc
+                    raise RetryableError(
+                        f"confluence temporary error: {exc.code}"
+                    ) from exc
                 raise
             except URLError as exc:
                 raise RetryableError(f"confluence network error: {exc}") from exc
@@ -91,9 +95,9 @@ class ConfluenceConnector(BaseConnector):
                 if updated_epoch <= since_epoch:
                     continue
                 max_updated = max(max_updated, updated_epoch)
-                content = (
-                    ((row.get("body") or {}).get("storage") or {}).get("value", "") or ""
-                )
+                content = ((row.get("body") or {}).get("storage") or {}).get(
+                    "value", ""
+                ) or ""
                 if not content.strip():
                     continue
                 page_id = row.get("id")
@@ -122,4 +126,3 @@ class ConfluenceConnector(BaseConnector):
                 break
         next_cursor = f"updated_at:{max_updated:.6f}"
         return PullResult(payloads=payloads, next_cursor=next_cursor, has_more=False)
-

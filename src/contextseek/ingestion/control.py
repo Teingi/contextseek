@@ -11,7 +11,11 @@ from contextseek.ingestion.connector_store import (
     ConnectorConfigStore,
     InMemoryConnectorConfigStore,
 )
-from contextseek.ingestion.models import ConnectorConfig, IngestionStatus, SyncCheckpoint
+from contextseek.ingestion.models import (
+    ConnectorConfig,
+    IngestionStatus,
+    SyncCheckpoint,
+)
 from contextseek.ingestion.registry import build_connector, build_normalizer
 from contextseek.ingestion.runtime import ConnectorRuntime
 
@@ -42,7 +46,9 @@ class IngestionControlPlane:
         connector = build_connector(config)
         normalizer = build_normalizer(config)
         self.runtime.register(config.connector_id, connector, normalizer)
-        self._events.setdefault(config.connector_id, deque(maxlen=self._event_buffer_size))
+        self._events.setdefault(
+            config.connector_id, deque(maxlen=self._event_buffer_size)
+        )
         return config
 
     def list_connectors(self) -> list[dict[str, Any]]:
@@ -225,4 +231,3 @@ class IngestionControlPlane:
             if 0 <= age <= window:
                 count += 1
         return round((count * 60.0) / window, 2)
-

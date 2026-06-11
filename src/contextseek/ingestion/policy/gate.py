@@ -87,4 +87,3 @@ class DefaultPolicyGate:
     def _sanitize_acl(self, principals: Iterable[str]) -> list[str]:
         cleaned = redact_principals(principals)
         return cleaned or [self._config.default_private_principal]
-

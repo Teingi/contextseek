@@ -181,7 +181,31 @@ def _warn_on_embedding_dims_change(
         pass
 
 
-def _build_adapter_from_settings(settings: Any) -> SeekVFSAdapter:
+class _BatchEmbeddingFunction:
+    """Adapt ContextSeek's single-text embedder to pyseekdb's batch protocol."""
+
+    def __init__(
+        self, embedder: Callable[[str], list[float]], *, dims: int = 0
+    ) -> None:
+        self._embedder = embedder
+        self._dims = int(dims or getattr(embedder, "dims", 0) or 0)
+
+    @property
+    def dimension(self) -> int:
+        if self._dims:
+            return self._dims
+        probe = self._embedder("dimension probe")
+        return len(probe) if probe else 0
+
+    def __call__(self, documents: list[str]) -> list[list[float]]:
+        return [self._embedder(text) for text in documents]
+
+
+def _build_adapter_from_settings(
+    settings: Any,
+    *,
+    seekdb_embedding_function: Any | None = None,
+) -> SeekVFSAdapter:
     """Build a VFS-backed storage adapter from ContextSeekSettings."""
     from seekvfs import VFS
 
@@ -242,6 +266,7 @@ def _build_adapter_from_settings(settings: Any) -> SeekVFSAdapter:
             database=seekdb.database,
             host=seekdb.host,
             port=seekdb.port,
+            embedding_function=seekdb_embedding_function,
         )
         backend.initialize()
     elif storage.backend == "file":
@@ -1904,14 +1929,24 @@ class ContextSeek:
             settings = ContextSeekSettings()
         strategy = to_strategy_config(settings)
 
-        # 1. Build storage adapter
-        adapter = _build_adapter_from_settings(settings)
-
-        # 2. Build resolver
-        resolver = ScopeResolver(uri_scheme=settings.storage.uri_scheme)
-
-        # 3. Build embedder (None if provider="none")
+        # 1. Build embedder (None if provider="none"). For seekdb, the storage
+        # collection must be created with the same embedding dimensionality that
+        # ContextSeek will write later.
         embedder = build_embedder(settings.embedding)
+        seekdb_embedding_function = None
+        if embedder is not None and settings.storage.backend == "seekdb":
+            seekdb_embedding_function = _BatchEmbeddingFunction(
+                embedder, dims=settings.embedding.dims
+            )
+
+        # 2. Build storage adapter
+        adapter = _build_adapter_from_settings(
+            settings,
+            seekdb_embedding_function=seekdb_embedding_function,
+        )
+
+        # 3. Build resolver
+        resolver = ScopeResolver(uri_scheme=settings.storage.uri_scheme)
 
         # 3a. Zero-config embedding: when seekdb backend is active and no external
         # embedder is configured, bridge pyseekdb's built-in all-MiniLM-L6-v2

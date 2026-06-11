@@ -34,7 +34,9 @@ class BaseConnector:
         return ["default"]
 
     def pull(self, partition: str, checkpoint: SyncCheckpoint | None) -> PullResult:
-        return PullResult(payloads=[], next_cursor=checkpoint.cursor if checkpoint else "")
+        return PullResult(
+            payloads=[], next_cursor=checkpoint.cursor if checkpoint else ""
+        )
 
 
 def cursor_as_epoch(cursor: str) -> float:
@@ -46,4 +48,3 @@ def cursor_as_epoch(cursor: str) -> float:
         except ValueError:
             return 0.0
     return 0.0
-

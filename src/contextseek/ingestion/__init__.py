@@ -105,4 +105,3 @@ __all__ = [
     "build_connector",
     "build_normalizer",
 ]
-

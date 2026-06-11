@@ -14,4 +14,3 @@ __all__ = [
     "mask_sensitive_paths",
     "redact_principals",
 ]
-

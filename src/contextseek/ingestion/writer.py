@@ -75,4 +75,3 @@ class IngestionWriter:
         self._fingerprint_index.add(secondary_key)
         self._latest_by_source[prev_key] = item.id
         return WriteResult(status="written", item_id=item.id)
-

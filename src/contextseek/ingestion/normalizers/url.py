@@ -20,4 +20,3 @@ class UrlNormalizer:
             partition=partition,
             source_type="url_doc",
         )
-

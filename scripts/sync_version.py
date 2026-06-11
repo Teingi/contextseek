@@ -73,7 +73,7 @@ def main() -> int:
     replace_first(
         REPO_ROOT / "desktop" / "tauri" / "src-tauri" / "Cargo.lock",
         r'(name = "contextseek-desktop"\nversion = ")[^"]+(")',
-        rf'\g<1>{version}\g<2>',
+        rf"\g<1>{version}\g<2>",
     )
 
     return 0

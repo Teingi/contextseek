@@ -67,4 +67,3 @@ def build_normalizer(config: ConnectorConfig) -> EventNormalizer:
         return GitHubNormalizer()
     msg = f"unsupported connector kind: {config.kind}"
     raise ValueError(msg)
-

@@ -15,6 +15,39 @@ import { useScope } from "@/context/ScopeContext";
 import { errorMessage } from "@/lib/utils";
 import type { AddResponse } from "@/lib/types";
 
+function tagsFromInput(value: string): string[] {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function tagsFromJson(value: unknown): string[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const raw = (value as Record<string, unknown>).tags;
+  if (Array.isArray(raw)) {
+    return raw
+      .map((tag) => (typeof tag === "string" ? tag.trim() : String(tag).trim()))
+      .filter(Boolean);
+  }
+  if (typeof raw === "string") return tagsFromInput(raw);
+  return [];
+}
+
+function mergeTags(...groups: string[][]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const group of groups) {
+    for (const tag of group) {
+      const key = tag.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(tag);
+    }
+  }
+  return result;
+}
+
 export function WritePanel() {
   const { t } = useI18n();
   const { scope } = useScope();
@@ -31,24 +64,24 @@ export function WritePanel() {
     setError(null);
     setResult(null);
     let payload: unknown = content;
+    let jsonTags: string[] = [];
     if (asJson) {
       try {
         payload = JSON.parse(content);
+        jsonTags = tagsFromJson(payload);
       } catch {
         setError(new Error(t("write.jsonInvalid")));
         return;
       }
     }
+    const resolvedTags = mergeTags(tagsFromInput(tags), jsonTags);
     setLoading(true);
     try {
       const res = await ctx.add({
         scope,
         content: payload,
         source: source || "api",
-        tags: tags
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter(Boolean),
+        tags: resolvedTags,
       });
       setResult(res);
       setContent("");

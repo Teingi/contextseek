@@ -20,4 +20,3 @@ class ConfluenceNormalizer:
             partition=partition,
             source_type="wiki_doc",
         )
-

@@ -105,4 +105,3 @@ class PolicyDecision:
     policy_version: str
     reason: str = ""
     redacted: bool = False
-

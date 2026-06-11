@@ -20,4 +20,3 @@ class NotesNormalizer:
             partition=partition,
             source_type="note",
         )
-

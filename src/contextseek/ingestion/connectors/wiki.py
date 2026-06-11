@@ -40,7 +40,9 @@ class WikiConnector(BaseConnector):
     def pull(self, partition: str, checkpoint: SyncCheckpoint | None) -> PullResult:
         feed_path = Path(str(self.config.config.get("feed_path", ""))).expanduser()
         if not feed_path.exists():
-            return PullResult(payloads=[], next_cursor=checkpoint.cursor if checkpoint else "")
+            return PullResult(
+                payloads=[], next_cursor=checkpoint.cursor if checkpoint else ""
+            )
 
         since = _cursor_to_ts(checkpoint.cursor if checkpoint else "")
         payloads: list[dict[str, Any]] = []
@@ -76,4 +78,3 @@ class WikiConnector(BaseConnector):
             )
         next_cursor = f"updated_at:{max_ts:.6f}"
         return PullResult(payloads=payloads, next_cursor=next_cursor, has_more=False)
-

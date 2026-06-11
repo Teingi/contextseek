@@ -40,7 +40,9 @@ def _extract_title(row: dict[str, Any]) -> str:
             continue
         if prop.get("type") == "title":
             title_chunks = prop.get("title") or []
-            texts = [str(chunk.get("plain_text", "")) for chunk in title_chunks if chunk]
+            texts = [
+                str(chunk.get("plain_text", "")) for chunk in title_chunks if chunk
+            ]
             title = "".join(texts).strip()
             if title:
                 return title
@@ -78,7 +80,9 @@ class NotionConnector(BaseConnector):
         token = str(self.config.config.get("token", ""))
         notion_version = str(self.config.config.get("notion_version", "2022-06-28"))
         if not token:
-            return PullResult(payloads=[], next_cursor=checkpoint.cursor if checkpoint else "")
+            return PullResult(
+                payloads=[], next_cursor=checkpoint.cursor if checkpoint else ""
+            )
 
         page_size = int(self.config.config.get("page_size", 50))
         start_cursor = _cursor_value(checkpoint.cursor if checkpoint else "")
@@ -147,4 +151,3 @@ class NotionConnector(BaseConnector):
             next_cursor=next_cursor,
             has_more=bool(data.get("has_more", False)),
         )
-

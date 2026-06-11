@@ -27,7 +27,9 @@ class IngestionScheduler:
         self._queue: list[ScheduledTask] = []
         self._retry_backoff_seconds = retry_backoff_seconds or RETRY_BACKOFF_SECONDS
 
-    def enqueue_now(self, connector_id: str, partition: str, *, reason: str = "") -> None:
+    def enqueue_now(
+        self, connector_id: str, partition: str, *, reason: str = ""
+    ) -> None:
         self._upsert_task(
             ScheduledTask(
                 run_after=time.time(),
@@ -89,4 +91,3 @@ class IngestionScheduler:
             self._queue = filtered
             heapq.heapify(self._queue)
         heapq.heappush(self._queue, task)
-

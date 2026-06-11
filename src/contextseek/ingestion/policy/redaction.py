@@ -33,4 +33,3 @@ def redact_principals(principals: Iterable[str]) -> list[str]:
         elif principal.startswith("group:"):
             result.append(principal)
     return result
-

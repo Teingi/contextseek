@@ -109,6 +109,8 @@ STORAGE_COLD_PATH=.contextseek/cold
 |---|---|
 | 单元测试 / CI | `InMemoryBackend` |
 | 本地开发、单进程 | `FileBackend` |
+| seekdb 嵌入式模式 | `STORAGE_BACKEND=seekdb`|
+| seekdb server mode | `STORAGE_BACKEND=oceanbase` |
 | 语义 / 向量检索 | OceanBase |
 | 生产多进程部署 | OceanBase |
 | 长期归档 | 分层（File + File 或 OceanBase + File）|

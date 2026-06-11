@@ -258,24 +258,21 @@ class ConnectorRuntime:
         for connector_id, stats in self._stats_by_connector.items():
             labels = f'connector_id="{connector_id}"'
             lines.append(
-                f"ingestion_events_total{{{labels},status=\"received\"}} {stats.events_total}"
+                f'ingestion_events_total{{{labels},status="received"}} {stats.events_total}'
             )
             lines.append(
-                f"ingestion_events_total{{{labels},status=\"written\"}} {stats.events_written}"
+                f'ingestion_events_total{{{labels},status="written"}} {stats.events_written}'
             )
             lines.append(
-                f"ingestion_events_total{{{labels},status=\"skipped\"}} {stats.events_skipped}"
+                f'ingestion_events_total{{{labels},status="skipped"}} {stats.events_skipped}'
             )
             lines.append(
-                f"ingestion_events_total{{{labels},status=\"rejected\"}} {stats.events_rejected}"
+                f'ingestion_events_total{{{labels},status="rejected"}} {stats.events_rejected}'
             )
-            lines.append(
-                f"ingestion_failed_total{{{labels}}} {stats.failed_total}"
-            )
+            lines.append(f"ingestion_failed_total{{{labels}}} {stats.failed_total}")
             checkpoints = self.checkpoint_snapshot(connector_id)
             if checkpoints:
                 lines.append(
                     f"checkpoint_partitions_total{{{labels}}} {len(checkpoints)}"
                 )
         return "\n".join(lines)
-

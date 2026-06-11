@@ -20,4 +20,3 @@ class WikiNormalizer:
             partition=partition,
             source_type="wiki_doc",
         )
-

@@ -78,9 +78,9 @@ contextseek overview --scope me/work
 
 | 键 | 默认 | 说明 |
 |----|------|------|
-| `STORAGE_BACKEND` | `seekdb` | 端侧默认嵌入式；也可切 `oceanbase` / `file` |
+| `STORAGE_BACKEND` | `seekdb` | 嵌入式模式填写 `seekdb`；seekdb server mode 填写 `oceanbase` |
 | `SEEKDB_PATH` | `~/.contextseek/seekdb.db` | 嵌入式数据文件 |
-| `SEEKDB_HOST` / `SEEKDB_PORT` | — | 取消注释切换到 seekdb server 模式 |
+| `SEEKDB_HOST` / `SEEKDB_PORT` | — | 取消注释切换到 seekdb server 模式；仅 server mode 需要使用 `STORAGE_BACKEND=oceanbase` |
 | `DEFAULT_SCOPE` | `me/work` | 省略 `--scope` 时使用的默认 scope |
 | `EVOLUTION_ENABLED` | `true` | 是否开启自动演进 |
 | `LIFECYCLE_INTERVAL_SECONDS` | `3600` | daemon 自动演进周期（秒） |

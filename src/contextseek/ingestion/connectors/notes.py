@@ -5,7 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from contextseek.ingestion.connectors.base import BaseConnector, PullResult, cursor_as_epoch
+from contextseek.ingestion.connectors.base import (
+    BaseConnector,
+    PullResult,
+    cursor_as_epoch,
+)
 from contextseek.ingestion.models import SyncCheckpoint
 
 
@@ -20,7 +24,9 @@ class NotesConnector(BaseConnector):
     def pull(self, partition: str, checkpoint: SyncCheckpoint | None) -> PullResult:
         root = Path(partition).expanduser()
         if not root.exists():
-            return PullResult(payloads=[], next_cursor=checkpoint.cursor if checkpoint else "")
+            return PullResult(
+                payloads=[], next_cursor=checkpoint.cursor if checkpoint else ""
+            )
         since_mtime = cursor_as_epoch(checkpoint.cursor if checkpoint else "")
         payloads: list[dict[str, Any]] = []
         max_mtime = since_mtime
@@ -54,4 +60,3 @@ class NotesConnector(BaseConnector):
             )
         next_cursor = f"mtime:{max_mtime:.6f}"
         return PullResult(payloads=payloads, next_cursor=next_cursor, has_more=False)
-

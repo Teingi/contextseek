@@ -25,6 +25,7 @@ STORAGE_BACKEND=seekdb                    # embedded mode, no changes needed
 SEEKDB_PATH=~/.contextseek/seekdb.db
 # SEEKDB_HOST=127.0.0.1                  # uncomment to switch to seekdb server
 # SEEKDB_PORT=2881
+# For seekdb server mode, set STORAGE_BACKEND=oceanbase instead.
 
 # --- Embedding (default: built-in all-MiniLM-L6-v2 via ONNX, no config needed) ---
 # EMBEDDING_PROVIDER=langchain
