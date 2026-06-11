@@ -161,7 +161,9 @@ fn show_app_or_diagnostic(win: &WebviewWindow, healthy: bool, port: u16) {
     let target = if healthy {
         format!("http://127.0.0.1:{port}/")
     } else {
-        format!("diagnostic.html?port={port}")
+        // `WebviewWindow::navigate` expects an absolute URL. A relative path
+        // would fail URL parsing and leave the loading page spinning forever.
+        format!("tauri://localhost/diagnostic.html?port={port}")
     };
     if let Ok(url) = target.parse() {
         let _ = win.navigate(url);

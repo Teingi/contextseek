@@ -67,8 +67,14 @@ def _get_default_env_file() -> str | None:
             return str(p)
 
     project_root = Path(__file__).resolve().parents[3]
+    try:
+        cwd = Path.cwd()
+    except (FileNotFoundError, OSError):
+        # Desktop app may start from a deleted/non-existent working directory.
+        # Fall back to project_root to keep settings bootstrap resilient.
+        cwd = project_root
     candidates = (
-        Path.cwd() / ".env",
+        cwd / ".env",
         project_root / ".env",
         project_root / "examples" / "configs" / ".env",
     )
