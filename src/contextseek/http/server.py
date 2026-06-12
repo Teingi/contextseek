@@ -334,11 +334,17 @@ def _update_env_file(updates: dict[str, str]) -> None:
                 lines, "LLM_KWARGS", "api_key", env_val
             )
             os.environ["LLM_KWARGS"] = serialized
+            # Compatibility path: OpenAI-compatible SDKs commonly read this key.
+            lines = _set_line(lines, "OPENAI_API_KEY", env_val)
+            os.environ["OPENAI_API_KEY"] = env_val
         elif env_key == "EMBEDDING_API_KEY":
             lines, serialized = _update_kwargs_key(
                 lines, "EMBEDDING_KWARGS", "api_key", env_val
             )
             os.environ["EMBEDDING_KWARGS"] = serialized
+            # Keep OPENAI_API_KEY in sync for shared-key deployments.
+            lines = _set_line(lines, "OPENAI_API_KEY", env_val)
+            os.environ["OPENAI_API_KEY"] = env_val
         else:
             lines = _set_line(lines, env_key, env_val)
             os.environ[env_key] = env_val
@@ -881,11 +887,13 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
             "llm_provider": s.llm.provider,
             "llm_model": s.llm.model or s.llm.provider,
             "llm_base_url": s.llm.base_url,
-            "llm_api_key": s.llm.kwargs.get("api_key", ""),
+            "llm_api_key": s.llm.kwargs.get("api_key", "")
+            or os.environ.get("OPENAI_API_KEY", ""),
             "embedding_provider": s.embedding.provider,
             "embedding_model": s.embedding.model or s.embedding.provider,
             "embedding_base_url": s.embedding.base_url,
-            "embedding_api_key": s.embedding.kwargs.get("api_key", ""),
+            "embedding_api_key": s.embedding.kwargs.get("api_key", "")
+            or os.environ.get("OPENAI_API_KEY", ""),
             "default_scope": s.default_scope,
             "version": PACKAGE_VERSION,
             "auto_sync": lc.auto_compact,

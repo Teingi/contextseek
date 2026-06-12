@@ -6,6 +6,7 @@ import { NavContext, type NavTarget } from "@/context/NavContext";
 import { ScopeProvider } from "@/context/ScopeContext";
 import { BrowsePanel } from "@/panels/BrowsePanel";
 import { EvolutionPanel } from "@/panels/EvolutionPanel";
+import { IngressPanel } from "@/panels/IngressPanel";
 import { OverviewPanel } from "@/panels/OverviewPanel";
 import { ProvenancePanel } from "@/panels/ProvenancePanel";
 import { RetrievePanel } from "@/panels/RetrievePanel";
@@ -37,6 +38,7 @@ export function App() {
         <div className="app-root">
           <AppLayout activePanel={panel} onNavigate={setPanel}>
             {panel === "overview" && <OverviewPanel />}
+            {panel === "ingress" && <IngressPanel />}
             {panel === "retrieve" && <RetrievePanel />}
             {panel === "browse" && <BrowsePanel />}
             {panel === "write" && <WritePanel />}

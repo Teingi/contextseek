@@ -1,6 +1,11 @@
 PYTHON ?= python3
 UV ?= uv
-UVICORN ?= $(PYTHON) -m uvicorn
+UVICORN ?= $(UV) run uvicorn
+BACKEND_HOST ?= 127.0.0.1
+BACKEND_PORT ?= 8000
+FRONTEND_HOST ?= 127.0.0.1
+FRONTEND_PORT ?= 3000
+VITE_CTX_BASE ?= http://$(BACKEND_HOST):$(BACKEND_PORT)
 
 .PHONY: help \
 	install install-http install-all install-hooks \
@@ -44,8 +49,9 @@ help:
 	@echo "  make demo-langchain   # Run LangChain-style ContextSeek demo"
 	@echo ""
 	@echo "Dev servers:"
-	@echo "  make backend          # Start API server at 127.0.0.1:8000 (with --reload)"
-	@echo "  make frontend         # Build + serve SPA at 127.0.0.1:3000 (needs backend)"
+	@echo "  make backend          # Start API server at $$(BACKEND_HOST):$$(BACKEND_PORT) (with --reload)"
+	@echo "  make frontend         # Build + serve SPA at $$(FRONTEND_HOST):$$(FRONTEND_PORT) (needs backend)"
+	@echo "                         (VITE_CTX_BASE defaults to http://$$(BACKEND_HOST):$$(BACKEND_PORT))"
 	@echo ""
 	@echo "Desktop (Tauri):"
 	@echo "  make desktop-server   # Run same-origin backend (API + SPA) at 127.0.0.1:\$$(DESKTOP_PORT)"
@@ -131,13 +137,13 @@ demo-langchain:
 	PYTHONPATH=src $(PYTHON) examples/langchain_pipeline.py
 
 backend:
-	PYTHONPATH=src $(UVICORN) contextseek.http.server:app --host 127.0.0.1 --port 8000 --reload
+	PYTHONPATH=src $(UVICORN) contextseek.http.server:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) --reload
 
 frontend:
 	@command -v npm >/dev/null 2>&1 || { echo "npm is required (install Node.js)"; exit 2; }
 	npm --prefix dashboard install
-	npm --prefix dashboard run build
-	npm --prefix dashboard run preview
+	VITE_CTX_BASE=$(VITE_CTX_BASE) npm --prefix dashboard run build
+	npm --prefix dashboard run preview -- --host $(FRONTEND_HOST) --port $(FRONTEND_PORT)
 
 # ── Desktop (Tauri) ─────────────────────────────────────────────────────────
 # Thin wrappers over scripts/ (kept as the single source of truth, also used by

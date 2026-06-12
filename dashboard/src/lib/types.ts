@@ -348,3 +348,75 @@ export interface SkillMdRequest {
 export interface SkillMdResponse {
   skills: SkillMdItem[];
 }
+
+export type ConnectorKind =
+  | "codex"
+  | "claude_code"
+  | "wiki"
+  | "notes"
+  | "url"
+  | "confluence"
+  | "notion"
+  | "github";
+
+export type ConnectorMode = "synced" | "direct" | "hybrid";
+
+export interface ConnectorRuntimeMetrics {
+  events_total: number;
+  events_written: number;
+  events_skipped: number;
+  events_rejected: number;
+  failed_total: number;
+  throughput_per_min: number;
+}
+
+export interface ConnectorConfig {
+  connector_id: string;
+  kind: ConnectorKind;
+  mode: ConnectorMode;
+  enabled: boolean;
+  owner: string;
+  config: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  checkpoint_count: number;
+  last_status: string;
+  last_success_at?: string | null;
+  retry_count: number;
+  runtime_metrics: ConnectorRuntimeMetrics;
+}
+
+export interface ConnectorCreateRequest {
+  connector_id: string;
+  kind: ConnectorKind;
+  mode: ConnectorMode;
+  config?: Record<string, unknown>;
+  enabled?: boolean;
+  owner?: string;
+}
+
+export interface ConnectorCheckpoint {
+  connector_id: string;
+  partition: string;
+  cursor: string;
+  last_success_at?: string | null;
+  last_event_count: number;
+  status: string;
+  retry_count: number;
+  last_error?: string | null;
+}
+
+export interface ConnectorEvent {
+  [key: string]: unknown;
+}
+
+export interface DeadLetterRecord {
+  id: string;
+  connector_id: string;
+  partition: string;
+  stage: string;
+  payload_json: Record<string, unknown> | null;
+  error_type: string;
+  error_message: string;
+  created_at: string;
+}

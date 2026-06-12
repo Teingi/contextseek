@@ -1,6 +1,7 @@
 import {
   Eye,
   GitGraph,
+  HardDriveUpload,
   LayoutDashboard,
   PlusCircle,
   Search,
@@ -12,6 +13,7 @@ import type { LucideIcon } from "lucide-react";
 
 export type PanelId =
   | "overview"
+  | "ingress"
   | "retrieve"
   | "browse"
   | "write"
@@ -29,6 +31,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { id: "overview", icon: LayoutDashboard },
+  { id: "ingress", icon: HardDriveUpload },
   { id: "retrieve", icon: Search },
   { id: "browse", icon: Eye },
   { id: "write", icon: PlusCircle },

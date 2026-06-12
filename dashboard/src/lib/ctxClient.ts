@@ -9,6 +9,10 @@ import type {
   CompactResponse,
   Config,
   ConfigUpdateRequest,
+  ConnectorCheckpoint,
+  ConnectorConfig,
+  ConnectorCreateRequest,
+  DeadLetterRecord,
   DeleteRequest,
   DreamRequest,
   DreamResponse,
@@ -35,6 +39,7 @@ import type {
   StatusIdResponse,
   UpstreamRequest,
   UpstreamResponse,
+  ConnectorEvent,
 } from "./types";
 
 // Backend API base URL. Defaults to "" (relative) so the SPA calls /add,
@@ -100,6 +105,12 @@ async function put<T>(path: string, payload: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function del<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { method: "DELETE" });
+  if (!res.ok) return parseError(res);
+  return res.json() as Promise<T>;
+}
+
 async function getText(path: string): Promise<string> {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) return parseError(res);
@@ -144,4 +155,48 @@ export const ctx = {
   skillTools: (req: SkillToolsRequest) => post<SkillToolsResponse>("/skill_tools", req),
   skillContext: (req: SkillContextRequest) => post<SkillContextResponse>("/skill_context", req),
   skillMd: (req: SkillMdRequest) => post<SkillMdResponse>("/skill_md", req),
+  createConnector: (req: ConnectorCreateRequest) =>
+    post<{ connector: string; kind: string; mode: string }>("/connectors", req),
+  connectors: () => get<{ connectors: ConnectorConfig[] }>("/connectors"),
+  syncConnector: (connectorId: string) =>
+    post<{ connector_id: string; scheduled_steps: number }>(
+      `/connectors/${encodeURIComponent(connectorId)}/sync`,
+      {},
+    ),
+  pauseConnector: (connectorId: string) =>
+    post<{ connector_id: string; status: string }>(
+      `/connectors/${encodeURIComponent(connectorId)}/pause`,
+      {},
+    ),
+  resumeConnector: (connectorId: string) =>
+    post<{ connector_id: string; status: string }>(
+      `/connectors/${encodeURIComponent(connectorId)}/resume`,
+      {},
+    ),
+  connectorCheckpoints: (connectorId: string) =>
+    get<{ connector_id: string; checkpoints: ConnectorCheckpoint[] }>(
+      `/connectors/${encodeURIComponent(connectorId)}/checkpoints`,
+    ),
+  connectorEvents: (connectorId: string) =>
+    get<{ connector_id: string; events: ConnectorEvent[] }>(
+      `/connectors/${encodeURIComponent(connectorId)}/events`,
+    ),
+  connectorDeadLetters: (connectorId: string) =>
+    get<{ connector_id: string; dead_letters: DeadLetterRecord[] }>(
+      `/connectors/${encodeURIComponent(connectorId)}/dead-letters`,
+    ),
+  replayDeadLetter: (connectorId: string, recordId: string) =>
+    post<{ record_id: string; connector_id: string; partition: string; scheduled_steps: number }>(
+      `/connectors/${encodeURIComponent(connectorId)}/dead-letters/${encodeURIComponent(recordId)}/replay`,
+      {},
+    ),
+  replayAllDeadLetters: (connectorId: string, removeAfterReplay = false) =>
+    post<{ connector_id: string; replayed_count: number; scheduled_steps: number }>(
+      `/connectors/${encodeURIComponent(connectorId)}/dead-letters/replay-all?remove_after_replay=${removeAfterReplay ? "true" : "false"}`,
+      {},
+    ),
+  deleteDeadLetter: (connectorId: string, recordId: string) =>
+    del<{ connector_id: string; record_id: string; deleted: true }>(
+      `/connectors/${encodeURIComponent(connectorId)}/dead-letters/${encodeURIComponent(recordId)}`,
+    ),
 };
