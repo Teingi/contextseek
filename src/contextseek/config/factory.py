@@ -16,6 +16,19 @@ from contextseek.config.settings import (
     SummarizerSettings,
 )
 
+_EMBEDDING_PROVIDERS: dict[str, tuple[str, int]] = {
+    "openai": ("langchain_openai.OpenAIEmbeddings", 1536),
+    "dashscope": ("langchain_community.embeddings.DashScopeEmbeddings", 1024),
+    "ollama": ("langchain_ollama.OllamaEmbeddings", 768),
+    "huggingface": ("langchain_huggingface.HuggingFaceEmbeddings", 512),
+}
+
+_LLM_PROVIDERS: dict[str, str] = {
+    "openai": "langchain_openai.ChatOpenAI",
+    "dashscope": "langchain_community.chat_models.ChatTongyi",
+    "ollama": "langchain_ollama.ChatOllama",
+}
+
 
 def _import_class(class_path: str) -> type:
     """Dynamically import a class from a dotted path.
@@ -48,19 +61,80 @@ def _normalize_legacy_openai_kwargs(init_kwargs: dict[str, Any]) -> dict[str, An
     return normalized
 
 
+def _normalize_provider(provider: str) -> str:
+    return provider.strip().lower()
+
+
+def _default_embedding_dims(provider: str, class_path: str = "") -> int:
+    if provider in _EMBEDDING_PROVIDERS:
+        return _EMBEDDING_PROVIDERS[provider][1]
+    for known_class_path, dims in _EMBEDDING_PROVIDERS.values():
+        if class_path == known_class_path:
+            return dims
+    return 1536
+
+
+def _resolve_embedding_provider(settings: EmbeddingSettings) -> tuple[str, int] | None:
+    provider = _normalize_provider(settings.provider)
+    if provider in {"", "none"}:
+        return None
+    if settings.class_path:
+        return settings.class_path, settings.dims or _default_embedding_dims(
+            provider, settings.class_path
+        )
+    if provider == "langchain":
+        return None
+    if provider not in _EMBEDDING_PROVIDERS:
+        supported = ", ".join(["none", "langchain", *_EMBEDDING_PROVIDERS])
+        raise ValueError(
+            f"Unknown embedding provider '{settings.provider}'. "
+            f"Supported providers: {supported}."
+        )
+    class_path, default_dims = _EMBEDDING_PROVIDERS[provider]
+    return class_path, settings.dims or default_dims
+
+
+def _resolve_llm_provider(settings: LLMSettings) -> str | None:
+    provider = _normalize_provider(settings.provider)
+    if provider in {"", "none"}:
+        return None
+    if settings.class_path:
+        return settings.class_path
+    if provider == "langchain":
+        return None
+    if provider not in _LLM_PROVIDERS:
+        supported = ", ".join(["none", "langchain", *_LLM_PROVIDERS])
+        raise ValueError(
+            f"Unknown LLM provider '{settings.provider}'. "
+            f"Supported providers: {supported}."
+        )
+    return _LLM_PROVIDERS[provider]
+
+
+def resolve_embedding_dims(settings: EmbeddingSettings) -> int:
+    """Return the vector dimensions that will be used for embedding settings."""
+    resolved = _resolve_embedding_provider(settings)
+    if resolved is None:
+        return 0
+    _, dims = resolved
+    return dims
+
+
 def build_embedder(settings: EmbeddingSettings) -> Callable[[str], list[float]] | None:
     """Build an embedder callable from settings.
 
     Returns None when provider is "none" (default).
     """
-    if settings.provider == "none" or not settings.class_path:
+    resolved = _resolve_embedding_provider(settings)
+    if resolved is None:
         return None
+    class_path, dims = resolved
 
     import contextseek.embedders.langchain_embedder as _lc_mod
 
     LangChainEmbedder = _lc_mod.LangChainEmbedder
 
-    cls = _import_class(settings.class_path)
+    cls = _import_class(class_path)
     init_kwargs: dict[str, Any] = {**settings.kwargs}
     init_kwargs = _normalize_legacy_openai_kwargs(init_kwargs)
     if settings.model:
@@ -69,7 +143,6 @@ def build_embedder(settings: EmbeddingSettings) -> Callable[[str], list[float]] 
         init_kwargs.setdefault("base_url", settings.base_url)
 
     embeddings_instance = cls(**init_kwargs)
-    dims = settings.dims or 1536  # fallback default
     return LangChainEmbedder(embeddings_instance, dims=dims)
 
 
@@ -80,10 +153,11 @@ def build_llm(settings: LLMSettings) -> Any | None:
     The returned object is a LangChain BaseChatModel that can be
     wrapped into score_fn / summarize_fn by callers.
     """
-    if settings.provider == "none" or not settings.class_path:
+    class_path = _resolve_llm_provider(settings)
+    if class_path is None:
         return None
 
-    cls = _import_class(settings.class_path)
+    cls = _import_class(class_path)
     init_kwargs: dict[str, Any] = {**settings.kwargs}
     init_kwargs = _normalize_legacy_openai_kwargs(init_kwargs)
     if settings.model:
@@ -143,4 +217,9 @@ def build_summarizer(
     return None
 
 
-__all__ = ["build_embedder", "build_llm", "build_summarizer"]
+__all__ = [
+    "build_embedder",
+    "build_llm",
+    "build_summarizer",
+    "resolve_embedding_dims",
+]

@@ -40,14 +40,11 @@ from contextseek.config.settings import (
 settings = ContextSeekSettings(
     storage=StorageSettings(backend="file", path="/var/lib/contextseek"),
     embedding=EmbeddingSettings(
-        provider="langchain",
-        class_path="langchain_openai.OpenAIEmbeddings",
+        provider="openai",
         model="text-embedding-3-small",
-        dims=1536,
     ),
     llm=LLMSettings(
-        provider="langchain",
-        class_path="langchain_openai.ChatOpenAI",
+        provider="openai",
         model="gpt-4o-mini",
     ),
     retrieval=RetrievalSettings(
@@ -84,16 +81,13 @@ STORAGE_PATH=.contextseek/data
 STORAGE_BACKEND=file
 STORAGE_PATH=.contextseek/data
 
-EMBEDDING_PROVIDER=langchain
-EMBEDDING_CLASS_PATH=langchain_openai.OpenAIEmbeddings
+EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-3-small
-EMBEDDING_DIMS=1536
 OPENAI_API_KEY=sk-...
 
 RETRIEVAL_RECALL_ROUTES=["phrase","terms","vector"]
 
-LLM_PROVIDER=langchain
-LLM_CLASS_PATH=langchain_openai.ChatOpenAI
+LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 
 SUMMARIZER_PROVIDER=llm
@@ -134,10 +128,10 @@ OceanBase 另见 `OB_*` 与 [存储后端](../guides/storage.md)。
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `EMBEDDING_PROVIDER` | `none` | `none` 或 `langchain` |
-| `EMBEDDING_CLASS_PATH` | — | 如 `langchain_openai.OpenAIEmbeddings` |
+| `EMBEDDING_PROVIDER` | `none` | `none`、`openai`、`dashscope`、`ollama`、`huggingface` 或 `langchain` |
+| `EMBEDDING_CLASS_PATH` | — | 可选自定义 LangChain 类，如 `langchain_openai.OpenAIEmbeddings` |
 | `EMBEDDING_MODEL` | — | 模型名 |
-| `EMBEDDING_DIMS` | `0` | 非 `none` 时必填 |
+| `EMBEDDING_DIMS` | `0` | 已知 provider 可省略并自动推断 |
 | `EMBEDDING_BASE_URL` | （空） | 可选基地址（OpenAI 兼容端点、Ollama 等） |
 
 `OPENAI_API_KEY` 等由 LangChain 类读取，非 ContextSeek 直接解析。
@@ -148,10 +142,12 @@ OceanBase 另见 `OB_*` 与 [存储后端](../guides/storage.md)。
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `LLM_PROVIDER` | `none` | `none` 或 `langchain` |
-| `LLM_CLASS_PATH` | — | 如 `langchain_openai.ChatOpenAI` |
+| `LLM_PROVIDER` | `none` | `none`、`openai`、`dashscope`、`ollama` 或 `langchain` |
+| `LLM_CLASS_PATH` | — | 可选自定义 LangChain 类，如 `langchain_openai.ChatOpenAI` |
 | `LLM_MODEL` | — | 对话模型名 |
 | `LLM_BASE_URL` | （空） | 可选基地址（OpenAI 兼容端点、Ollama 等） |
+
+自定义 LangChain 类可使用 `provider=langchain` 并配置 `*_CLASS_PATH`。
 
 ### Summarizer（`SUMMARIZER_*`）
 
@@ -222,8 +218,7 @@ OceanBase 另见 `OB_*` 与 [存储后端](../guides/storage.md)。
 | **3** | `EVOLUTION_LLM_STAGE_INFER_ENABLED`、`EVOLUTION_LLM_DISTILL_ENABLED`、`EVOLUTION_LLM_FEEDBACK_ENABLED` | 阶段推断、技能蒸馏、反馈解析 |
 
 ```env
-LLM_PROVIDER=langchain
-LLM_CLASS_PATH=langchain_openai.ChatOpenAI
+LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 OPENAI_API_KEY=sk-...
 

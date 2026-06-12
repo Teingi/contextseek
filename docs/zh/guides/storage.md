@@ -75,10 +75,8 @@ STORAGE_OB_TABLE=context_items
 配合 Embedding 提供方使用，`retrieve()` 会自动启用混合召回：
 
 ```env
-EMBEDDING_PROVIDER=langchain
-EMBEDDING_CLASS_PATH=langchain_openai.OpenAIEmbeddings
+EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-3-small
-EMBEDDING_DIMS=1536
 OPENAI_API_KEY=sk-...
 ```
 
@@ -121,7 +119,7 @@ STORAGE_COLD_PATH=.contextseek/cold
 
 向量召回需要同时满足：
 
-1. 已配置 Embedding 提供方（`EMBEDDING_PROVIDER=langchain` + `EMBEDDING_CLASS_PATH`）
+1. 已配置 Embedding 提供方（如 `EMBEDDING_PROVIDER=openai`）
 2. 使用支持向量存储和查询的后端（OceanBase；`FileBackend` 仅回退到关键词匹配）
 
 若 `EMBEDDING_PROVIDER=none`（默认），`retrieve()` 仅使用短语和词项匹配。

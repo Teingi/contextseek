@@ -44,6 +44,7 @@ python -c "from contextseek import ContextSeek; print(ContextSeek.from_settings(
 | `openai` | langchain-openai | `pip install contextseek[langchain,openai]` |
 | `ollama` | langchain-ollama | `pip install contextseek[langchain,ollama]` |
 | `huggingface` | langchain-huggingface | `pip install contextseek[langchain,huggingface]` |
+| `dashscope` | langchain-community、DashScope SDK | `pip install contextseek[langchain,dashscope]` |
 | `oceanbase` | pyobvector、SQLAlchemy | `pip install contextseek[oceanbase]` |
 | `test` | pytest | `pip install contextseek[test]` |
 
@@ -52,10 +53,11 @@ python -c "from contextseek import ContextSeek; print(ContextSeek.from_settings(
 ```bash
 pip install "contextseek[http,langchain,openai]"
 pip install "contextseek[oceanbase,langchain,openai,http]"
+pip install "contextseek[oceanbase,langchain,dashscope,http]"
 pip install -e ".[test]"   # 贡献代码
 ```
 
-> **注意：** 仅装 `langchain` 不会安装具体 Embedding/Chat 实现，需同时安装 `openai` / `ollama` / `huggingface` 之一，再配置 `EMBEDDING_CLASS_PATH`、`LLM_CLASS_PATH`。
+> **注意：** 仅装 `langchain` 不会安装具体 Embedding/Chat 实现。将 `EMBEDDING_PROVIDER` / `LLM_PROVIDER` 设为 `openai`、`ollama`、`huggingface` 或 `dashscope` 时，需要安装对应 extra 或手动安装 provider 包。
 
 ## 从源码安装
 

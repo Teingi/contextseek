@@ -27,11 +27,41 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ctx } from "@/lib/ctxClient";
 import { useI18n } from "@/lib/i18n";
-import type { Config, ConfigUpdateRequest, Health } from "@/lib/types";
+import type { Config, ConfigTestResponse, ConfigUpdateRequest, Health } from "@/lib/types";
 
 const HEALTH_POLL_MS = 15_000;
+type ProviderOption = {
+  value: string;
+  label: string;
+};
+
+const LLM_PROVIDER_OPTIONS: ProviderOption[] = [
+  { value: "none", label: "none" },
+  { value: "openai", label: "openai" },
+  { value: "dashscope", label: "dashscope" },
+  { value: "ollama", label: "ollama" },
+];
+const EMBEDDING_PROVIDER_OPTIONS = [
+  { value: "none", label: "none" },
+  { value: "openai", label: "openai" },
+  { value: "dashscope", label: "dashscope" },
+  { value: "ollama", label: "ollama" },
+  { value: "huggingface", label: "huggingface" },
+];
+
+function toUiProvider(provider: string | undefined) {
+  if (!provider || provider === "langchain") return "openai";
+  return provider;
+}
 
 function isDesktopApp() {
   const maybeWindow = window as Window & {
@@ -120,37 +150,88 @@ function EditableRow({
   );
 }
 
-function ToggleRow({
+function ProviderSelectRow({
   label,
-  checked,
+  value,
+  options,
   isEditing,
-  onLabel,
-  offLabel,
   onChange,
 }: {
   label: string;
-  checked: boolean;
+  value: string;
+  options: ProviderOption[];
   isEditing: boolean;
-  onLabel: string;
-  offLabel: string;
-  onChange: (checked: boolean) => void;
+  onChange: (value: string) => void;
 }) {
+  const display = value ? value : "none";
+  const selectValue =
+    options.some((option) => option.value === display) ? display : "openai";
+  const displayLabel =
+    options.find((option) => option.value === display)?.label ??
+    (display === "langchain" ? "openai" : display);
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
       <span className="text-xs text-muted-foreground">{label}</span>
       {isEditing ? (
-        <label className="flex items-center gap-2 text-xs font-medium">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={checked}
-            onChange={(e) => onChange(e.target.checked)}
-          />
-          {checked ? onLabel : offLabel}
-        </label>
+        <Select value={selectValue} onValueChange={onChange}>
+          <SelectTrigger className="h-7 w-44 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value} className="text-xs">
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       ) : (
-        <span className="text-xs font-medium">{checked ? onLabel : offLabel}</span>
+        <span className="text-xs font-medium">{displayLabel}</span>
       )}
+    </div>
+  );
+}
+
+function ConnectionTestRow({
+  label,
+  result,
+  testing,
+  onTest,
+}: {
+  label: string;
+  result: ConfigTestResponse | null;
+  testing: boolean;
+  onTest: () => void;
+}) {
+  const stateLabel = testing ? "Testing" : result ? (result.ok ? "Connected" : "Failed") : "Not tested";
+  return (
+    <div className="flex items-center justify-between gap-3 py-1.5">
+      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+        <span
+          className={`truncate text-right text-xs ${
+            result
+              ? result.ok
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-destructive"
+              : "text-muted-foreground"
+          }`}
+          title={result?.message ?? stateLabel}
+        >
+          {result?.message ?? stateLabel}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 shrink-0 px-2 text-xs"
+          disabled={testing}
+          onClick={onTest}
+        >
+          {testing && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+          Test
+        </Button>
+      </div>
     </div>
   );
 }
@@ -169,6 +250,9 @@ export function SettingsPanel() {
   const [isSaving, setIsSaving] = useState(false);
   const [showRestartDialog, setShowRestartDialog] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
+  const [testingTarget, setTestingTarget] = useState<"llm" | "embedding" | null>(null);
+  const [llmTestResult, setLlmTestResult] = useState<ConfigTestResponse | null>(null);
+  const [embeddingTestResult, setEmbeddingTestResult] = useState<ConfigTestResponse | null>(null);
 
   const fetchAll = useCallback(async () => {
     setError(false);
@@ -276,6 +360,8 @@ export function SettingsPanel() {
 
   const setField = <K extends keyof ConfigUpdateRequest>(key: K, val: string) => {
     setDraft((prev) => ({ ...prev, [key]: val }));
+    if (String(key).startsWith("llm_")) setLlmTestResult(null);
+    if (String(key).startsWith("embedding_")) setEmbeddingTestResult(null);
   };
 
   // ── 包安装 ────────────────────────────────────────────────────────────────
@@ -366,16 +452,64 @@ export function SettingsPanel() {
     ? ["memory", "file", "sqlite", "oceanbase"]
     : ["memory", "file", "sqlite", "seekdb", "oceanbase"];
   const seekdbMode = config?.seekdb_mode ?? "embedded";
-  const currentLlmProvider =
-    config?.llm_provider ?? (config?.llm_model === "none" ? "none" : "langchain");
+  const currentLlmProvider = toUiProvider(
+    config?.llm_provider ?? (config?.llm_model === "none" ? "none" : "openai"),
+  );
   const currentEmbeddingProvider =
-    config?.embedding_provider ??
-    (config?.embedding_model === "none" ? "none" : "langchain");
+    toUiProvider(
+      config?.embedding_provider ??
+        (config?.embedding_model === "none" ? "none" : "openai"),
+    );
   const llmProvider = (isEditing ? draft.llm_provider : undefined) ?? currentLlmProvider;
   const embeddingProvider =
     (isEditing ? draft.embedding_provider : undefined) ?? currentEmbeddingProvider;
   const llmEnabled = config ? llmProvider !== "none" : false;
   const embeddingEnabled = config ? embeddingProvider !== "none" : false;
+
+  const handleTestLlm = async () => {
+    setTestingTarget("llm");
+    setLlmTestResult(null);
+    try {
+      const result = await ctx.testConfig({
+        target: "llm",
+        provider: llmProvider,
+        model: draft.llm_model ?? config?.llm_model ?? "",
+        base_url: draft.llm_base_url ?? config?.llm_base_url ?? "",
+        api_key: draft.llm_api_key ?? config?.llm_api_key ?? "",
+      });
+      setLlmTestResult(result);
+    } catch (exc) {
+      setLlmTestResult({
+        ok: false,
+        message: exc instanceof Error ? exc.message : "Connection test failed.",
+      });
+    } finally {
+      setTestingTarget(null);
+    }
+  };
+
+  const handleTestEmbedding = async () => {
+    setTestingTarget("embedding");
+    setEmbeddingTestResult(null);
+    try {
+      const result = await ctx.testConfig({
+        target: "embedding",
+        provider: embeddingProvider,
+        model: draft.embedding_model ?? config?.embedding_model ?? "",
+        dims: draft.embedding_dims ?? config?.embedding_dims ?? "",
+        base_url: draft.embedding_base_url ?? config?.embedding_base_url ?? "",
+        api_key: draft.embedding_api_key ?? config?.embedding_api_key ?? "",
+      });
+      setEmbeddingTestResult(result);
+    } catch (exc) {
+      setEmbeddingTestResult({
+        ok: false,
+        message: exc instanceof Error ? exc.message : "Connection test failed.",
+      });
+    } finally {
+      setTestingTarget(null);
+    }
+  };
 
   const aboutRows = [{ label: t("settings.about.version"), value: val(config?.version) }];
 
@@ -481,13 +615,12 @@ export function SettingsPanel() {
       {/* LLM group */}
       <SettingsGroup icon={Bot} title={t("settings.llm")} desc={t("settings.llm.desc")}>
         <div className="divide-y">
-          <ToggleRow
-            label={t("settings.provider.enabled")}
-            checked={llmEnabled}
+          <ProviderSelectRow
+            label={t("settings.provider.label")}
+            value={llmProvider}
+            options={LLM_PROVIDER_OPTIONS}
             isEditing={isEditing}
-            onLabel={t("settings.provider.on")}
-            offLabel={t("settings.provider.off")}
-            onChange={(checked) => setField("llm_provider", checked ? "langchain" : "none")}
+            onChange={(value) => setField("llm_provider", value)}
           />
           {llmEnabled && (
             <>
@@ -516,6 +649,12 @@ export function SettingsPanel() {
                 placeholder="sk-..."
                 onChange={(v) => setField("llm_api_key", v)}
               />
+              <ConnectionTestRow
+                label={t("settings.connectionTest")}
+                result={llmTestResult}
+                testing={testingTarget === "llm"}
+                onTest={handleTestLlm}
+              />
             </>
           )}
         </div>
@@ -524,15 +663,12 @@ export function SettingsPanel() {
       {/* Embedder group */}
       <SettingsGroup icon={Braces} title={t("settings.embedder")} desc={t("settings.embedder.desc")}>
         <div className="divide-y">
-          <ToggleRow
-            label={t("settings.provider.enabled")}
-            checked={embeddingEnabled}
+          <ProviderSelectRow
+            label={t("settings.provider.label")}
+            value={embeddingProvider}
+            options={EMBEDDING_PROVIDER_OPTIONS}
             isEditing={isEditing}
-            onLabel={t("settings.provider.on")}
-            offLabel={t("settings.provider.off")}
-            onChange={(checked) =>
-              setField("embedding_provider", checked ? "langchain" : "none")
-            }
+            onChange={(value) => setField("embedding_provider", value)}
           />
           {embeddingEnabled && (
             <>
@@ -543,6 +679,14 @@ export function SettingsPanel() {
                 isEditing={isEditing}
                 placeholder="provider/model"
                 onChange={(v) => setField("embedding_model", v)}
+              />
+              <EditableRow
+                label={t("settings.embedder.dims")}
+                value={config?.embedding_dims ?? ""}
+                draftValue={draft.embedding_dims}
+                isEditing={isEditing}
+                placeholder="auto"
+                onChange={(v) => setField("embedding_dims", v)}
               />
               <EditableRow
                 label={t("settings.embedder.baseUrl")}
@@ -560,6 +704,12 @@ export function SettingsPanel() {
                 isPassword
                 placeholder="sk-..."
                 onChange={(v) => setField("embedding_api_key", v)}
+              />
+              <ConnectionTestRow
+                label={t("settings.connectionTest")}
+                result={embeddingTestResult}
+                testing={testingTarget === "embedding"}
+                onTest={handleTestEmbedding}
               />
             </>
           )}

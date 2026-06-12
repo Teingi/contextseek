@@ -32,7 +32,7 @@ pip install "contextseek[oceanbase,langchain]"
 # Embeddings provider 任选其一：
 pip install "contextseek[openai]"   # OpenAI
 pip install "contextseek[ollama]"   # Ollama 本地
-pip install langchain-community dashscope  # 阿里云百炼 / DashScope
+pip install "contextseek[dashscope]"  # 阿里云百炼 / DashScope
 ```
 
 演示：

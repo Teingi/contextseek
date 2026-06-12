@@ -112,6 +112,7 @@ class ConfigUpdateRequest(BaseModel):
     llm_base_url: str | None = None
     llm_api_key: str | None = None
     embedding_model: str | None = None
+    embedding_dims: str | None = None
     embedding_base_url: str | None = None
     embedding_api_key: str | None = None
     ob_host: str | None = None
@@ -124,6 +125,15 @@ class ConfigUpdateRequest(BaseModel):
     seekdb_path: str | None = None
     sqlite_path: str | None = None
     storage_path: str | None = None
+
+
+class ConfigTestRequest(BaseModel):
+    target: str
+    provider: str
+    model: str = ""
+    base_url: str = ""
+    api_key: str = ""
+    dims: str | None = None
 
 
 class SkillContextRequest(BaseModel):
@@ -699,10 +709,12 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
 
     @app.get("/config")
     async def get_config() -> dict[str, Any]:
+        from contextseek.config.factory import resolve_embedding_dims
         from contextseek.config.settings import ContextSeekSettings, LifecycleSettings
 
         s = ContextSeekSettings()
         lc = LifecycleSettings()
+        embedding_dims = resolve_embedding_dims(s.embedding)
         result: dict[str, Any] = {
             "storage_backend": s.storage.backend,
             "llm_provider": s.llm.provider,
@@ -711,6 +723,7 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
             "llm_api_key": s.llm.kwargs.get("api_key", ""),
             "embedding_provider": s.embedding.provider,
             "embedding_model": s.embedding.model or s.embedding.provider,
+            "embedding_dims": str(embedding_dims) if embedding_dims else "",
             "embedding_base_url": s.embedding.base_url,
             "embedding_api_key": s.embedding.kwargs.get("api_key", ""),
             "default_scope": s.default_scope,
@@ -759,6 +772,7 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
             "llm_api_key": "LLM_API_KEY",
             "embedding_provider": "EMBEDDING_PROVIDER",
             "embedding_model": "EMBEDDING_MODEL",
+            "embedding_dims": "EMBEDDING_DIMS",
             "embedding_base_url": "EMBEDDING_BASE_URL",
             "embedding_api_key": "EMBEDDING_API_KEY",
             "ob_host": "OB_HOST",
@@ -776,6 +790,8 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
         for field, env_key in FIELD_TO_ENV.items():
             val = getattr(req, field, None)
             if val is not None:
+                if field == "embedding_dims" and val.strip() == "":
+                    val = "0"
                 updates[env_key] = val
         if not updates:
             return {"status": "ok", "restart_required": False}
@@ -786,6 +802,97 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
 
             raise HTTPException(status_code=500, detail=str(e)) from e
         return {"status": "ok", "restart_required": True}
+
+    @app.post("/config/test")
+    async def test_config_connection(req: ConfigTestRequest) -> dict[str, Any]:
+        from contextseek.config.factory import (
+            build_embedder,
+            build_llm,
+            resolve_embedding_dims,
+        )
+        from contextseek.config.settings import EmbeddingSettings, LLMSettings
+        from contextseek.llm.client import coerce_response_text
+
+        target = req.target.strip().lower()
+        provider = req.provider.strip().lower()
+        kwargs = {"api_key": req.api_key} if req.api_key else {}
+        if provider in {"", "none"}:
+            return {
+                "ok": False,
+                "message": "Provider is disabled.",
+            }
+
+        try:
+            if target == "llm":
+                llm = build_llm(
+                    LLMSettings(
+                        provider=provider,
+                        model=req.model.strip(),
+                        base_url=req.base_url.strip(),
+                        kwargs=kwargs,
+                    )
+                )
+                if llm is None:
+                    return {"ok": False, "message": "LLM is not configured."}
+                try:
+                    from langchain_core.messages import HumanMessage
+
+                    resp = llm.invoke(
+                        [HumanMessage(content="Reply with exactly: pong")]
+                    )
+                except Exception as exc:
+                    return {"ok": False, "message": str(exc)}
+                text = coerce_response_text(resp).strip()
+                return {
+                    "ok": bool(text),
+                    "message": "LLM connection succeeded."
+                    if text
+                    else "LLM returned an empty response.",
+                    "detail": text[:200],
+                }
+
+            if target == "embedding":
+                dims = 0
+                if req.dims is not None and req.dims.strip():
+                    dims = int(req.dims)
+                settings = EmbeddingSettings(
+                    provider=provider,
+                    model=req.model.strip(),
+                    dims=dims,
+                    base_url=req.base_url.strip(),
+                    kwargs=kwargs,
+                )
+                embedder = build_embedder(settings)
+                if embedder is None:
+                    return {"ok": False, "message": "Embedding is not configured."}
+                try:
+                    vector = embedder("contextseek connectivity test")
+                except Exception as exc:
+                    return {"ok": False, "message": str(exc)}
+                actual_dims = len(vector)
+                configured_dims = resolve_embedding_dims(settings)
+                ok = actual_dims > 0 and (
+                    configured_dims == 0 or actual_dims == configured_dims
+                )
+                message = (
+                    f"Embedding connection succeeded. Dimension: {actual_dims}."
+                    if ok
+                    else (
+                        "Embedding connection succeeded, but returned dimension "
+                        f"{actual_dims} differs from configured dimension "
+                        f"{configured_dims}."
+                    )
+                )
+                return {
+                    "ok": ok,
+                    "message": message,
+                    "dimension": actual_dims,
+                    "configured_dimension": configured_dims,
+                }
+        except Exception as exc:
+            return {"ok": False, "message": str(exc)}
+
+        return {"ok": False, "message": f"Unknown config test target: {req.target}"}
 
     @app.get("/metrics")
     async def metrics() -> str:

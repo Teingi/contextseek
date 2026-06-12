@@ -46,6 +46,7 @@ Extras are [PEP 508](https://peps.python.org/pep-0508/) dependency groups. Combi
 | `openai` | `langchain-openai` | `pip install contextseek[langchain,openai]` |
 | `ollama` | `langchain-ollama` | `pip install contextseek[langchain,ollama]` |
 | `huggingface` | `langchain-huggingface` | `pip install contextseek[langchain,huggingface]` |
+| `dashscope` | `langchain-community`, DashScope SDK | `pip install contextseek[langchain,dashscope]` |
 | `oceanbase` | `pyobvector`, SQLAlchemy | `pip install contextseek[oceanbase]` |
 | `test` | `pytest` | `pip install contextseek[test]` |
 
@@ -58,11 +59,14 @@ pip install "contextseek[http,langchain,openai]"
 # OceanBase deployment
 pip install "contextseek[oceanbase,langchain,openai,http]"
 
+# OceanBase deployment with DashScope embeddings
+pip install "contextseek[oceanbase,langchain,dashscope,http]"
+
 # Contributing to the repo
 pip install -e ".[test]"
 ```
 
-> **LangChain note:** `langchain` alone does not install a chat or embedding implementation. Always add `openai`, `ollama`, or `huggingface` (or install those packages manually) before setting `EMBEDDING_CLASS_PATH` / `LLM_CLASS_PATH`.
+> **LangChain note:** `langchain` alone does not install a chat or embedding implementation. Always add `openai`, `ollama`, `huggingface`, or `dashscope` (or install those packages manually) before setting `EMBEDDING_PROVIDER` / `LLM_PROVIDER` to that provider.
 
 ## Install from source
 

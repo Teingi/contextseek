@@ -100,8 +100,7 @@ The summarizer is not configured. L1 summaries are empty so ContextSeek falls ba
 
 ```env
 SUMMARIZER_PROVIDER=llm
-LLM_PROVIDER=langchain
-LLM_CLASS_PATH=langchain_openai.ChatOpenAI
+LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 ```
 

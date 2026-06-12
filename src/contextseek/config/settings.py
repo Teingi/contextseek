@@ -195,10 +195,10 @@ class EmbeddingSettings(BaseSettings):
     model_config = nested_section_config("EMBEDDING_")
 
     provider: str = "none"
-    """Provider: "none" (disabled) or "langchain"."""
+    """Provider: "none", "openai", "dashscope", "ollama", "huggingface", or "langchain"."""
 
     class_path: str = ""
-    """Fully qualified class path, e.g. "langchain_openai.OpenAIEmbeddings"."""
+    """Optional fully qualified class path for custom LangChain embeddings."""
 
     model: str = ""
     """Model name passed to the provider constructor."""
@@ -219,10 +219,10 @@ class LLMSettings(BaseSettings):
     model_config = nested_section_config("LLM_")
 
     provider: str = "none"
-    """Provider: "none" (disabled) or "langchain"."""
+    """Provider: "none", "openai", "dashscope", "ollama", or "langchain"."""
 
     class_path: str = ""
-    """Fully qualified class path, e.g. "langchain_openai.ChatOpenAI"."""
+    """Optional fully qualified class path for a custom LangChain chat model."""
 
     model: str = ""
     """Model name passed to the provider constructor."""
@@ -437,12 +437,9 @@ class ContextSeekSettings(BaseSettings):
 
         STORAGE_BACKEND=file
         STORAGE_PATH=.contextseek/data
-        EMBEDDING_PROVIDER=langchain
-        EMBEDDING_CLASS_PATH=langchain_openai.OpenAIEmbeddings
+        EMBEDDING_PROVIDER=openai
         EMBEDDING_MODEL=text-embedding-3-small
-        EMBEDDING_DIMS=1536
-        LLM_PROVIDER=langchain
-        LLM_CLASS_PATH=langchain_openai.ChatOpenAI
+        LLM_PROVIDER=openai
         LLM_MODEL=gpt-4o-mini
         EVOLUTION_ENABLED=true
         OBSERVABILITY_AUDIT_ENABLED=true

@@ -8,6 +8,8 @@ import type {
   CompactRequest,
   CompactResponse,
   Config,
+  ConfigTestRequest,
+  ConfigTestResponse,
   ConfigUpdateRequest,
   DeleteRequest,
   DreamRequest,
@@ -125,6 +127,7 @@ export const ctx = {
   config: () => get<Config>("/config"),
   updateConfig: (req: ConfigUpdateRequest) =>
     put<{ status: string; restart_required: boolean }>("/config", req),
+  testConfig: (req: ConfigTestRequest) => post<ConfigTestResponse>("/config/test", req),
   restart: async () => {
     const invoke = getTauriInvoke();
     if (invoke) {

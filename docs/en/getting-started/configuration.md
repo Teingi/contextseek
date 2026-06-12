@@ -40,14 +40,11 @@ from contextseek.config.settings import (
 settings = ContextSeekSettings(
     storage=StorageSettings(backend="file", path="/var/lib/contextseek"),
     embedding=EmbeddingSettings(
-        provider="langchain",
-        class_path="langchain_openai.OpenAIEmbeddings",
+        provider="openai",
         model="text-embedding-3-small",
-        dims=1536,
     ),
     llm=LLMSettings(
-        provider="langchain",
-        class_path="langchain_openai.ChatOpenAI",
+        provider="openai",
         model="gpt-4o-mini",
     ),
     retrieval=RetrievalSettings(
@@ -88,16 +85,13 @@ Suitable for single-node apps and examples. Retrieval uses substring match on fi
 STORAGE_BACKEND=file
 STORAGE_PATH=.contextseek/data
 
-EMBEDDING_PROVIDER=langchain
-EMBEDDING_CLASS_PATH=langchain_openai.OpenAIEmbeddings
+EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-3-small
-EMBEDDING_DIMS=1536
 OPENAI_API_KEY=sk-...
 
 RETRIEVAL_RECALL_ROUTES=["phrase","terms","vector"]
 
-LLM_PROVIDER=langchain
-LLM_CLASS_PATH=langchain_openai.ChatOpenAI
+LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 
 SUMMARIZER_PROVIDER=llm
@@ -140,10 +134,10 @@ OceanBase uses additional `OB_*` variables when built via runtime factory / exam
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `EMBEDDING_PROVIDER` | `none` | `none` or `langchain` |
-| `EMBEDDING_CLASS_PATH` | — | e.g. `langchain_openai.OpenAIEmbeddings` |
+| `EMBEDDING_PROVIDER` | `none` | `none`, `openai`, `dashscope`, `ollama`, `huggingface`, or `langchain` |
+| `EMBEDDING_CLASS_PATH` | — | Optional custom LangChain class, e.g. `langchain_openai.OpenAIEmbeddings` |
 | `EMBEDDING_MODEL` | — | Model name for provider ctor |
-| `EMBEDDING_DIMS` | `0` | Required when provider ≠ `none` |
+| `EMBEDDING_DIMS` | `0` | Optional for known providers; inferred when omitted |
 | `EMBEDDING_BASE_URL` | (empty) | Optional base URL (for OpenAI-compatible endpoints, Ollama, etc.) |
 
 Provider API keys (`OPENAI_API_KEY`, `DASHSCOPE_API_KEY`, …) are read by LangChain classes, not by ContextSeek directly.
@@ -154,10 +148,12 @@ Used for rerank, summarizer, evolution, dream, conflict judge — any feature th
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LLM_PROVIDER` | `none` | `none` or `langchain` |
-| `LLM_CLASS_PATH` | — | e.g. `langchain_openai.ChatOpenAI` |
+| `LLM_PROVIDER` | `none` | `none`, `openai`, `dashscope`, `ollama`, or `langchain` |
+| `LLM_CLASS_PATH` | — | Optional custom LangChain class, e.g. `langchain_openai.ChatOpenAI` |
 | `LLM_MODEL` | — | Chat model name |
 | `LLM_BASE_URL` | (empty) | Optional base URL (for OpenAI-compatible endpoints, Ollama, etc.) |
+
+Use `provider=langchain` with `*_CLASS_PATH` for custom LangChain classes.
 
 ### Summarizer (`SUMMARIZER_*`)
 
@@ -248,8 +244,7 @@ Enable features incrementally to control cost and debug behavior:
 Example `.env` skeleton:
 
 ```env
-LLM_PROVIDER=langchain
-LLM_CLASS_PATH=langchain_openai.ChatOpenAI
+LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 OPENAI_API_KEY=sk-...
 
