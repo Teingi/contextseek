@@ -21,6 +21,7 @@ from contextseek.ingestion import (
 )
 from contextseek.ingestion.connectors.base import PullResult
 from contextseek.ingestion.registry import build_connector, build_normalizer
+from contextseek.ingestion.connectors.url import UrlConnector
 
 
 def _sample_event(*, content: str = "hello", source_id: str = "doc-1") -> RawEvent:
@@ -196,6 +197,159 @@ def test_runtime_runs_and_persists_checkpoint() -> None:
     assert checkpoints[0]["status"] == "synced"
     assert checkpoints[0]["cursor"] == "done"
     assert runtime.stats.events_written == 1
+
+
+def test_url_connector_skips_script_style_noise(monkeypatch) -> None:
+    cfg = ConnectorConfig(
+        connector_id="url-main",
+        kind=ConnectorKind.url,
+        mode=ConnectorMode.synced,
+        config={"url": "https://example.com/docs"},
+    )
+    connector = UrlConnector(cfg)
+
+    class _FakeResponse:
+        def __init__(self, text: str) -> None:
+            self._text = text
+            self.headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+        def read(self) -> bytes:
+            return self._text.encode("utf-8")
+
+    html = """
+    <html>
+      <head>
+        <title>OceanBase Docs</title>
+        <script>window.injectInfo = { appName: "noise" };</script>
+        <style>body { display: none; }</style>
+      </head>
+      <body>
+        <main>OBDiag command guide and troubleshooting.</main>
+      </body>
+    </html>
+    """
+
+    monkeypatch.setattr(
+        "contextseek.ingestion.connectors.url.request.urlopen",
+        lambda req, timeout=10: _FakeResponse(html),
+    )
+    result = connector.pull("https://example.com/docs", None)
+    assert len(result.payloads) == 1
+    content = result.payloads[0]["content"]
+    assert "OBDiag command guide" in content
+    assert "window.injectInfo" not in content
+    assert "display: none" not in content
+
+
+def test_url_connector_falls_back_to_title_and_meta_when_body_empty(monkeypatch) -> None:
+    cfg = ConnectorConfig(
+        connector_id="url-main",
+        kind=ConnectorKind.url,
+        mode=ConnectorMode.synced,
+        config={"url": "https://example.com/docs"},
+    )
+    connector = UrlConnector(cfg)
+
+    class _FakeResponse:
+        def __init__(self, text: str) -> None:
+            self._text = text
+            self.headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+        def read(self) -> bytes:
+            return self._text.encode("utf-8")
+
+    html = """
+    <html>
+      <head>
+        <title>OceanBase Docs</title>
+        <meta name="description" content="OBDiag usage and FAQ" />
+        <script>window.noise = true;</script>
+      </head>
+      <body><script>console.log("only script");</script></body>
+    </html>
+    """
+
+    monkeypatch.setattr(
+        "contextseek.ingestion.connectors.url.request.urlopen",
+        lambda req, timeout=10: _FakeResponse(html),
+    )
+    result = connector.pull("https://example.com/docs", None)
+    assert len(result.payloads) == 1
+    content = result.payloads[0]["content"]
+    assert "OceanBase Docs" in content
+    assert "OBDiag usage and FAQ" in content
+
+
+def test_url_connector_discovery_crawls_same_host_docs_links(monkeypatch) -> None:
+    cfg = ConnectorConfig(
+        connector_id="url-main",
+        kind=ConnectorKind.url,
+        mode=ConnectorMode.synced,
+        config={
+            "url": "https://example.com/docs/obdiag-cn",
+            "crawl": True,
+            "max_pages": 5,
+            "same_host_only": True,
+            "restrict_to_seed_path": True,
+        },
+    )
+    connector = UrlConnector(cfg)
+    html_by_url = {
+        "https://example.com/docs/obdiag-cn": """
+            <html><body>
+              <a href="/docs/obdiag-cn/100.install">Install</a>
+              <a href="https://other.com/docs/obdiag-cn/200.ignored">External</a>
+              <a href="/docs/another-product">Another docs</a>
+            </body></html>
+        """,
+        "https://example.com/docs/obdiag-cn/100.install": """
+            <html><body>
+              <a href="/docs/obdiag-cn/200.run">Run</a>
+            </body></html>
+        """,
+        "https://example.com/docs/obdiag-cn/200.run": "<html><body>run page</body></html>",
+    }
+
+    class _FakeResponse:
+        def __init__(self, text: str) -> None:
+            self._text = text
+            self.headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+        def read(self) -> bytes:
+            return self._text.encode("utf-8")
+
+    def _fake_urlopen(req, timeout=10):
+        url = req.full_url if hasattr(req, "full_url") else str(req)
+        return _FakeResponse(html_by_url[url])
+
+    monkeypatch.setattr(
+        "contextseek.ingestion.connectors.url.request.urlopen",
+        _fake_urlopen,
+    )
+    discovered = connector.discover()
+    assert "https://example.com/docs/obdiag-cn" in discovered
+    assert "https://example.com/docs/obdiag-cn/100.install" in discovered
+    assert "https://example.com/docs/obdiag-cn/200.run" in discovered
+    assert "https://other.com/docs/obdiag-cn/200.ignored" not in discovered
+    assert "https://example.com/docs/another-product" not in discovered
 
 
 def test_registry_supports_confluence_notion_github() -> None:
