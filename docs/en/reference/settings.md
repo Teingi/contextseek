@@ -35,10 +35,10 @@ OceanBase is instantiated via the runtime factory or examples — these vars are
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `EMBEDDING_PROVIDER` | `none` | `none` (disabled) or `langchain` |
-| `EMBEDDING_CLASS_PATH` | _(empty)_ | Fully qualified class, e.g. `langchain_openai.OpenAIEmbeddings` |
+| `EMBEDDING_PROVIDER` | `none` | `none`, `openai`, `dashscope`, `ollama`, `huggingface`, or `langchain` |
+| `EMBEDDING_CLASS_PATH` | _(empty)_ | Optional custom LangChain class, e.g. `langchain_openai.OpenAIEmbeddings` |
 | `EMBEDDING_MODEL` | _(empty)_ | Model name passed to the provider constructor |
-| `EMBEDDING_DIMS` | `0` | Vector dimensions — required when provider ≠ `none` |
+| `EMBEDDING_DIMS` | `0` | Vector dimensions; inferred for known providers when omitted |
 | `EMBEDDING_KWARGS` | `{}` | Extra kwargs forwarded to the provider constructor (JSON object) |
 
 Provider API keys (`OPENAI_API_KEY`, `DASHSCOPE_API_KEY`, etc.) are read directly by the LangChain class, not by ContextSeek.
@@ -49,10 +49,12 @@ Shared LLM client used by: reranker, summarizer, evolution engine, dream engine,
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LLM_PROVIDER` | `none` | `none` (disabled) or `langchain` |
-| `LLM_CLASS_PATH` | _(empty)_ | Fully qualified class, e.g. `langchain_openai.ChatOpenAI` |
+| `LLM_PROVIDER` | `none` | `none`, `openai`, `dashscope`, `ollama`, or `langchain` |
+| `LLM_CLASS_PATH` | _(empty)_ | Optional custom LangChain class, e.g. `langchain_openai.ChatOpenAI` |
 | `LLM_MODEL` | _(empty)_ | Chat model name |
 | `LLM_KWARGS` | `{}` | Extra kwargs forwarded to the provider constructor (JSON object) |
+
+Use `provider=langchain` with `*_CLASS_PATH` for custom LangChain classes.
 
 ## Summarizer (`SUMMARIZER_*`)
 
@@ -196,15 +198,12 @@ STORAGE_BACKEND=file
 STORAGE_PATH=.contextseek/data
 
 # Embeddings (OpenAI example)
-EMBEDDING_PROVIDER=langchain
-EMBEDDING_CLASS_PATH=langchain_openai.OpenAIEmbeddings
+EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-3-small
-EMBEDDING_DIMS=1536
 OPENAI_API_KEY=sk-...
 
 # LLM
-LLM_PROVIDER=langchain
-LLM_CLASS_PATH=langchain_openai.ChatOpenAI
+LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 
 # Retrieval

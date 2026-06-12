@@ -200,6 +200,7 @@ export interface Config {
   llm_api_key?: string;
   embedding_provider?: string;
   embedding_model: string;
+  embedding_dims?: string;
   embedding_base_url?: string;
   embedding_api_key?: string;
   default_scope: string;
@@ -232,6 +233,7 @@ export interface ConfigUpdateRequest {
   llm_api_key?: string;
   embedding_provider?: string;
   embedding_model?: string;
+  embedding_dims?: string;
   embedding_base_url?: string;
   embedding_api_key?: string;
   ob_host?: string;
@@ -244,6 +246,23 @@ export interface ConfigUpdateRequest {
   seekdb_path?: string;
   sqlite_path?: string;
   storage_path?: string;
+}
+
+export interface ConfigTestRequest {
+  target: "llm" | "embedding";
+  provider: string;
+  model?: string;
+  base_url?: string;
+  api_key?: string;
+  dims?: string;
+}
+
+export interface ConfigTestResponse {
+  ok: boolean;
+  message: string;
+  detail?: string;
+  dimension?: number;
+  configured_dimension?: number;
 }
 
 // ---- request payloads ----

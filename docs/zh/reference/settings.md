@@ -35,10 +35,10 @@ OceanBase 通过运行时工厂或 `from_runtime_config()` 实例化，默认 `f
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `EMBEDDING_PROVIDER` | `none` | `none`（禁用）或 `langchain` |
-| `EMBEDDING_CLASS_PATH` | _(空)_ | 完整类路径，如 `langchain_openai.OpenAIEmbeddings` |
+| `EMBEDDING_PROVIDER` | `none` | `none`、`openai`、`dashscope`、`ollama`、`huggingface` 或 `langchain` |
+| `EMBEDDING_CLASS_PATH` | _(空)_ | 可选自定义 LangChain 类，如 `langchain_openai.OpenAIEmbeddings` |
 | `EMBEDDING_MODEL` | _(空)_ | 传给 provider 构造函数的模型名 |
-| `EMBEDDING_DIMS` | `0` | 向量维度，provider ≠ `none` 时必填 |
+| `EMBEDDING_DIMS` | `0` | 向量维度；已知 provider 可省略并自动推断 |
 | `EMBEDDING_KWARGS` | `{}` | 传给 provider 构造函数的额外参数（JSON 对象） |
 
 Provider 的 API Key（`OPENAI_API_KEY`、`DASHSCOPE_API_KEY` 等）由 LangChain 类直接读取，ContextSeek 不处理。
@@ -49,10 +49,12 @@ Provider 的 API Key（`OPENAI_API_KEY`、`DASHSCOPE_API_KEY` 等）由 LangChai
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `LLM_PROVIDER` | `none` | `none`（禁用）或 `langchain` |
-| `LLM_CLASS_PATH` | _(空)_ | 完整类路径，如 `langchain_openai.ChatOpenAI` |
+| `LLM_PROVIDER` | `none` | `none`、`openai`、`dashscope`、`ollama` 或 `langchain` |
+| `LLM_CLASS_PATH` | _(空)_ | 可选自定义 LangChain 类，如 `langchain_openai.ChatOpenAI` |
 | `LLM_MODEL` | _(空)_ | Chat 模型名 |
 | `LLM_KWARGS` | `{}` | 传给 provider 构造函数的额外参数（JSON 对象） |
+
+自定义 LangChain 类可使用 `provider=langchain` 并配置 `*_CLASS_PATH`。
 
 ## 摘要生成（`SUMMARIZER_*`）
 
@@ -196,15 +198,12 @@ STORAGE_BACKEND=file
 STORAGE_PATH=.contextseek/data
 
 # 向量嵌入（OpenAI 示例）
-EMBEDDING_PROVIDER=langchain
-EMBEDDING_CLASS_PATH=langchain_openai.OpenAIEmbeddings
+EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-3-small
-EMBEDDING_DIMS=1536
 OPENAI_API_KEY=sk-...
 
 # LLM
-LLM_PROVIDER=langchain
-LLM_CLASS_PATH=langchain_openai.ChatOpenAI
+LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 
 # 检索

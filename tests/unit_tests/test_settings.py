@@ -16,7 +16,12 @@ from contextseek.config.settings import (
     StorageSettings,
     to_strategy_config,
 )
-from contextseek.config.factory import _import_class, build_embedder, build_llm
+from contextseek.config.factory import (
+    _import_class,
+    build_embedder,
+    build_llm,
+    resolve_embedding_dims,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +153,22 @@ class TestToStrategyConfig:
 class TestFactory:
     """Test lazy model factory functions."""
 
+    @staticmethod
+    def _fake_langchain_embedder():
+        class FakeLangChainEmbedder:
+            def __init__(self, embeddings, *, dims):
+                self._embeddings = embeddings
+                self._dims = dims
+
+            def __call__(self, text: str) -> list[float]:
+                return self._embeddings.embed_query(text)
+
+            @property
+            def dims(self) -> int:
+                return self._dims
+
+        return FakeLangChainEmbedder
+
     def test_build_embedder_none(self):
         """Provider 'none' returns None without any imports."""
         result = build_embedder(EmbeddingSettings())
@@ -164,20 +185,11 @@ class TestFactory:
         mock_embeddings.embed_query.return_value = [0.1] * 768
         mock_cls = MagicMock(return_value=mock_embeddings)
 
-        # Create a fake LangChainEmbedder that wraps without langchain_core
-        class FakeLangChainEmbedder:
-            def __init__(self, embeddings, *, dims):
-                self._embeddings = embeddings
-                self._dims = dims
-
-            def __call__(self, text: str) -> list[float]:
-                return self._embeddings.embed_query(text)
-
         with (
             patch("contextseek.config.factory._import_class", return_value=mock_cls),
             patch(
                 "contextseek.embedders.langchain_embedder.LangChainEmbedder",
-                FakeLangChainEmbedder,
+                self._fake_langchain_embedder(),
             ),
         ):
             embedder = build_embedder(
@@ -197,6 +209,90 @@ class TestFactory:
         result = embedder("hello")
         assert result == [0.1] * 768
         mock_embeddings.embed_query.assert_called_once_with("hello")
+
+    def test_build_embedder_openai_provider_alias(self):
+        """Provider aliases resolve class_path and default dimensions."""
+        mock_embeddings = MagicMock()
+        mock_cls = MagicMock(return_value=mock_embeddings)
+
+        with (
+            patch(
+                "contextseek.config.factory._import_class", return_value=mock_cls
+            ) as import_class,
+            patch(
+                "contextseek.embedders.langchain_embedder.LangChainEmbedder",
+                self._fake_langchain_embedder(),
+            ),
+        ):
+            embedder = build_embedder(
+                EmbeddingSettings(provider="openai", model="text-embedding-3-small")
+            )
+
+        assert embedder is not None
+        assert embedder.dims == 1536
+        import_class.assert_called_once_with("langchain_openai.OpenAIEmbeddings")
+        mock_cls.assert_called_once_with(model="text-embedding-3-small")
+
+    def test_build_embedder_ollama_provider_default_dims(self):
+        """Ollama alias uses its provider-specific default dimensions."""
+        mock_embeddings = MagicMock()
+        mock_cls = MagicMock(return_value=mock_embeddings)
+
+        with (
+            patch("contextseek.config.factory._import_class", return_value=mock_cls),
+            patch(
+                "contextseek.embedders.langchain_embedder.LangChainEmbedder",
+                self._fake_langchain_embedder(),
+            ),
+        ):
+            embedder = build_embedder(
+                EmbeddingSettings(provider="ollama", model="nomic-embed-text")
+            )
+
+        assert embedder is not None
+        assert embedder.dims == 768
+
+    def test_resolve_embedding_dims_for_legacy_openai_class_path(self):
+        """Legacy langchain_openai class_path reports its effective default dims."""
+        dims = resolve_embedding_dims(
+            EmbeddingSettings(
+                provider="langchain",
+                class_path="langchain_openai.OpenAIEmbeddings",
+            )
+        )
+
+        assert dims == 1536
+
+    def test_build_embedder_explicit_class_path_overrides_provider_alias(self):
+        """Explicit class_path remains the escape hatch for custom providers."""
+        mock_embeddings = MagicMock()
+        mock_cls = MagicMock(return_value=mock_embeddings)
+
+        with (
+            patch(
+                "contextseek.config.factory._import_class", return_value=mock_cls
+            ) as import_class,
+            patch(
+                "contextseek.embedders.langchain_embedder.LangChainEmbedder",
+                self._fake_langchain_embedder(),
+            ),
+        ):
+            embedder = build_embedder(
+                EmbeddingSettings(
+                    provider="openai",
+                    class_path="custom_pkg.CustomEmbeddings",
+                    dims=42,
+                )
+            )
+
+        assert embedder is not None
+        assert embedder.dims == 42
+        import_class.assert_called_once_with("custom_pkg.CustomEmbeddings")
+
+    def test_build_embedder_unknown_provider(self):
+        """Unknown providers fail with a clear error."""
+        with pytest.raises(ValueError, match="Unknown embedding provider"):
+            build_embedder(EmbeddingSettings(provider="not-real"))
 
     def test_build_llm_none(self):
         """Provider 'none' returns None."""
@@ -220,6 +316,57 @@ class TestFactory:
 
         assert llm is mock_llm
         mock_cls.assert_called_once_with(temperature=0.0, model="gpt-4o-mini")
+
+    def test_build_llm_provider_alias(self):
+        """LLM aliases resolve to their LangChain chat classes."""
+        mock_llm = MagicMock()
+        mock_cls = MagicMock(return_value=mock_llm)
+
+        with patch(
+            "contextseek.config.factory._import_class", return_value=mock_cls
+        ) as import_class:
+            llm = build_llm(
+                LLMSettings(
+                    provider="dashscope",
+                    model="qwen-plus",
+                    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                    kwargs={"temperature": 0.0},
+                )
+            )
+
+        assert llm is mock_llm
+        import_class.assert_called_once_with(
+            "langchain_community.chat_models.ChatTongyi"
+        )
+        mock_cls.assert_called_once_with(
+            temperature=0.0,
+            model="qwen-plus",
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
+
+    def test_build_llm_explicit_class_path_overrides_provider_alias(self):
+        """Explicit class_path wins over provider aliases."""
+        mock_llm = MagicMock()
+        mock_cls = MagicMock(return_value=mock_llm)
+
+        with patch(
+            "contextseek.config.factory._import_class", return_value=mock_cls
+        ) as import_class:
+            llm = build_llm(
+                LLMSettings(
+                    provider="openai",
+                    class_path="custom_pkg.CustomChatModel",
+                    model="custom-model",
+                )
+            )
+
+        assert llm is mock_llm
+        import_class.assert_called_once_with("custom_pkg.CustomChatModel")
+
+    def test_build_llm_unknown_provider(self):
+        """Unknown LLM providers fail with a clear error."""
+        with pytest.raises(ValueError, match="Unknown LLM provider"):
+            build_llm(LLMSettings(provider="not-real"))
 
     def test_import_class_invalid(self):
         """Invalid class_path raises ImportError."""

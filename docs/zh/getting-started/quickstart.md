@@ -88,10 +88,8 @@ for spec in ctx.tools():
 ## 5. 向量检索（可选）
 
 ```env
-EMBEDDING_PROVIDER=langchain
-EMBEDDING_CLASS_PATH=langchain_openai.OpenAIEmbeddings
+EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-3-small
-EMBEDDING_DIMS=1536
 RETRIEVAL_RECALL_ROUTES=["phrase","terms","vector"]
 ```
 

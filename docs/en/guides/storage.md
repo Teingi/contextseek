@@ -75,10 +75,8 @@ STORAGE_OB_TABLE=context_items
 Pair with an embedding provider so `retrieve()` uses hybrid recall:
 
 ```env
-EMBEDDING_PROVIDER=langchain
-EMBEDDING_CLASS_PATH=langchain_openai.OpenAIEmbeddings
+EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-3-small
-EMBEDDING_DIMS=1536
 OPENAI_API_KEY=sk-...
 ```
 
@@ -121,7 +119,7 @@ Writes always go to the hot tier. `compact()` moves archived items (ephemeral TT
 
 Vector recall requires both:
 
-1. A configured embedding provider (`EMBEDDING_PROVIDER=langchain` + `EMBEDDING_CLASS_PATH`)
+1. A configured embedding provider (for example, `EMBEDDING_PROVIDER=openai`)
 2. A backend that stores and queries vectors (OceanBase; `FileBackend` falls back to keyword-only recall)
 
 If `EMBEDDING_PROVIDER=none` (default), `retrieve()` uses phrase and term matching only.
