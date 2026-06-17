@@ -1,12 +1,15 @@
 """Tests for CLI argument parsing and validation."""
 
 import argparse
+import json
+from contextlib import redirect_stdout
 from contextlib import redirect_stderr
 from io import StringIO
 
 import pytest
 
-from contextseek.cli.main import build_parser, _positive_int
+from contextseek.cli.main import build_parser, run_cli, _positive_int
+from contextseek.client.contextseek import ContextSeek
 
 
 class TestPositiveInt:
@@ -48,3 +51,27 @@ class TestRetrieveKValidation:
             ["retrieve", "--scope", "t", "--query", "q", "--k", "5"]
         )
         assert args.k == 5
+
+
+class TestExpandOutput:
+    def test_expand_reports_missing_ids(self) -> None:
+        ctx = ContextSeek()
+        item = ctx.add("expand target", scope="t/p", source="test")
+        out = StringIO()
+
+        with redirect_stdout(out):
+            code = run_cli(
+                [
+                    "expand",
+                    "--scope",
+                    "t/p",
+                    "--ids",
+                    f"{item.id},missing-id",
+                ],
+                client=ctx,
+            )
+
+        payload = json.loads(out.getvalue())
+        assert code == 0
+        assert [it["id"] for it in payload["items"]] == [item.id]
+        assert payload["missing_ids"] == ["missing-id"]
