@@ -476,10 +476,12 @@ def run_cli(
     if args.command == "expand":
         ids = [i.strip() for i in args.ids.split(",") if i.strip()]
         items: list = []
+        missing_ids: list[str] = []
         for iid in ids:
             ref = ctx.resolver.ref_for(args.scope, iid)
             payload = ctx.adapter.read(ref)
             if payload is None:
+                missing_ids.append(iid)
                 continue
             try:
                 items.append(deserialize_context_item(payload))
@@ -487,7 +489,10 @@ def run_cli(
                 continue
         print(
             json.dumps(
-                {"items": [serialize_context_item(it) for it in items]},
+                {
+                    "items": [serialize_context_item(it) for it in items],
+                    "missing_ids": missing_ids,
+                },
                 ensure_ascii=False,
             )
         )
