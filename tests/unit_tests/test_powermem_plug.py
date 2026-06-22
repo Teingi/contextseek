@@ -1064,6 +1064,11 @@ def test_proxy_install_claude_code_installs_missing_powermem_package(
         "CONTEXTSEEK_POWERMEM_PACKAGE_INSTALL_COMMAND",
         f"{fake_installer} {{requirement}}",
     )
+    monkeypatch.setattr(
+        plug_runtime.PythonPackageRuntimeInstaller,
+        "_runtime_ready",
+        lambda self, python: True,
+    )
     plug = PowerMemProxyPlug(base_url="http://powermem.local")
 
     result = plug.install(linker="claude-code-http")
