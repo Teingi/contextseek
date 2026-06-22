@@ -5,6 +5,7 @@ from __future__ import annotations
 from io import StringIO
 from types import SimpleNamespace
 
+from contextseek.domain.results import ResponseMeta, RetrieveResponse
 from contextseek.mcp.runtime import run_stdio_server
 from contextseek.mcp.server import ContextSeekMCPServer
 
@@ -33,7 +34,7 @@ def test_mcp_retrieve_forwards_include_expired_flag() -> None:
         def retrieve(self, query, **kwargs):
             self.query = query
             self.kwargs = kwargs
-            return []
+            return RetrieveResponse(items=[], meta=ResponseMeta(layer="full"))
 
     fake = FakeClient()
     server = ContextSeekMCPServer(client=fake)
