@@ -311,6 +311,8 @@ class LifecycleScheduler:
             all_dream_items = list(report.consolidation.items)
             if report.divergence:
                 all_dream_items.extend(report.divergence.items)
+            if report.pitfall:
+                all_dream_items.extend(report.pitfall.items)
 
             for item in all_dream_items:
                 if self.client.embedder is not None:
@@ -327,6 +329,9 @@ class LifecycleScheduler:
                     "consolidation_items": len(report.consolidation.items),
                     "divergence_items": len(report.divergence.items)
                     if report.divergence
+                    else 0,
+                    "pitfall_items": len(report.pitfall.items)
+                    if report.pitfall
                     else 0,
                     "patterns_found": report.consolidation.patterns_found,
                     "total": report.total_dream_items,
