@@ -15,6 +15,11 @@ class ContextSeekMCPServer:
 
     client: ContextSeek
 
+    @classmethod
+    def with_default_client(cls) -> "ContextSeekMCPServer":
+        """Create a server backed by the default ContextSeek settings."""
+        return cls(client=ContextSeek.from_settings())
+
     def list_tools(self) -> list[dict[str, Any]]:
         """Return MCP tool definitions."""
         return [
@@ -43,6 +48,7 @@ class ContextSeekMCPServer:
                     "query": {"type": "string", "required": True},
                     "k": {"type": "integer", "default": 10},
                     "full": {"type": "boolean", "default": False},
+                    "include_expired": {"type": "boolean", "default": False},
                 },
             },
             {
@@ -179,6 +185,7 @@ class ContextSeekMCPServer:
                 scope=arguments["scope"],
                 k=arguments.get("k", 10),
                 full=bool(arguments.get("full", False)),
+                include_expired=bool(arguments.get("include_expired", False)),
             )
             return {
                 "items": [
@@ -239,6 +246,8 @@ class ContextSeekMCPServer:
                 "merged": report.merged_count,
                 "archived": report.archived_count,
                 "evolved": report.evolved_count,
+                "conflict_updated": report.conflict_updated_count,
+                "conflict_drift": report.conflict_drift_count,
             }
 
         if name == "contextseek_dream":
@@ -253,6 +262,7 @@ class ContextSeekMCPServer:
                 "divergence_items": len(report.divergence.items)
                 if report.divergence
                 else 0,
+                "pitfall_items": len(report.pitfall.items) if report.pitfall else 0,
             }
 
         if name == "contextseek_overview":

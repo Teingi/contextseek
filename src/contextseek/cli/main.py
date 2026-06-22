@@ -55,6 +55,16 @@ def _resolve_scope(args: argparse.Namespace, default_scope: str) -> str:
     return scope
 
 
+def _positive_int(value: str) -> int:
+    """Validate and parse a positive integer (> 0)."""
+    n = int(value)
+    if n <= 0:
+        raise argparse.ArgumentTypeError(
+            f"invalid positive int value: {value!r} (must be > 0)"
+        )
+    return n
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build CLI parser for commands."""
     parser = argparse.ArgumentParser(prog="contextseek")
@@ -73,7 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     retrieve_parser.add_argument("--scope", default=None)
     retrieve_parser.add_argument("--query", required=True)
-    retrieve_parser.add_argument("--k", type=int, default=10)
+    retrieve_parser.add_argument("--k", type=_positive_int, default=10)
     retrieve_parser.add_argument(
         "--full",
         action="store_true",
@@ -83,6 +93,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         help="emit machine-readable JSON instead of human-readable output",
+    )
+    retrieve_parser.add_argument(
+        "--tags",
+        default="",
+        help="comma-separated tag filter; returned items must contain all tags",
     )
     retrieve_parser.add_argument(
         "--verbose",
@@ -429,6 +444,7 @@ def run_cli(
         return 0
 
     if args.command == "retrieve":
+        tags = [t.strip() for t in args.tags.split(",") if t.strip()]
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             response = ctx.retrieve(
@@ -436,6 +452,7 @@ def run_cli(
                 scope=args.scope,
                 k=args.k,
                 full=args.full,
+                tags=tags or None,
             )
         output = {
             "items": [
@@ -466,10 +483,12 @@ def run_cli(
     if args.command == "expand":
         ids = [i.strip() for i in args.ids.split(",") if i.strip()]
         items: list = []
+        missing_ids: list[str] = []
         for iid in ids:
             ref = ctx.resolver.ref_for(args.scope, iid)
             payload = ctx.adapter.read(ref)
             if payload is None:
+                missing_ids.append(iid)
                 continue
             try:
                 items.append(deserialize_context_item(payload))
@@ -477,7 +496,10 @@ def run_cli(
                 continue
         print(
             json.dumps(
-                {"items": [serialize_context_item(it) for it in items]},
+                {
+                    "items": [serialize_context_item(it) for it in items],
+                    "missing_ids": missing_ids,
+                },
                 ensure_ascii=False,
             )
         )
@@ -491,6 +513,8 @@ def run_cli(
                     "merged": report.merged_count,
                     "archived": report.archived_count,
                     "evolved": report.evolved_count,
+                    "conflict_updated": report.conflict_updated_count,
+                    "conflict_drift": report.conflict_drift_count,
                 },
                 ensure_ascii=False,
             )
@@ -624,6 +648,7 @@ def run_cli(
                     "divergence_items": len(report.divergence.items)
                     if report.divergence
                     else 0,
+                    "pitfall_items": len(report.pitfall.items) if report.pitfall else 0,
                 },
                 ensure_ascii=False,
             )
