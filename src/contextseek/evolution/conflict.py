@@ -24,7 +24,7 @@ import math
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable
+from typing import Callable
 
 from contextseek.domain.context_item import ContextItem
 from contextseek.domain.links import Link, LinkType
