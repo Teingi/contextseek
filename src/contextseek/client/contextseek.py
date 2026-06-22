@@ -1440,13 +1440,14 @@ class ContextSeek:
             item = deserialize_context_item(payload)
 
             if item_id in used:
-                item.relevance_boost = max(
-                    0.1, min(5.0, item.relevance_boost + reward)
-                )
+                item.relevance_boost = max(0.1, min(5.0, item.relevance_boost + reward))
                 item.access_count += 1
                 item.last_accessed_at = now
                 item.importance = min(5.0, item.importance + reward * 0.2)
-                if item.relevance_boost >= 2.0 and "evolution_candidate" not in item.tags:
+                if (
+                    item.relevance_boost >= 2.0
+                    and "evolution_candidate" not in item.tags
+                ):
                     item.tags.append("evolution_candidate")
                 rewarded += 1
             elif decay_unused:

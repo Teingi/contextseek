@@ -641,9 +641,7 @@ def run_cli(
                     "divergence_items": len(report.divergence.items)
                     if report.divergence
                     else 0,
-                    "pitfall_items": len(report.pitfall.items)
-                    if report.pitfall
-                    else 0,
+                    "pitfall_items": len(report.pitfall.items) if report.pitfall else 0,
                 },
                 ensure_ascii=False,
             )

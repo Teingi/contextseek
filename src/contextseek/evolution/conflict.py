@@ -33,7 +33,21 @@ from contextseek.domain.stages import STAGE_CONFIDENCE
 # Negation markers across English and Chinese — asymmetry between two otherwise
 # similar statements is a strong contradiction signal.
 _NEGATION = frozenset(
-    {"not", "no", "never", "none", "cannot", "n't", "without", "无", "不", "没", "別", "别", "非"}
+    {
+        "not",
+        "no",
+        "never",
+        "none",
+        "cannot",
+        "n't",
+        "without",
+        "无",
+        "不",
+        "没",
+        "別",
+        "别",
+        "非",
+    }
 )
 _NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?")
 

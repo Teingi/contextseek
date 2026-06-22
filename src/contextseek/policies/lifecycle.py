@@ -330,9 +330,7 @@ class LifecycleScheduler:
                     "divergence_items": len(report.divergence.items)
                     if report.divergence
                     else 0,
-                    "pitfall_items": len(report.pitfall.items)
-                    if report.pitfall
-                    else 0,
+                    "pitfall_items": len(report.pitfall.items) if report.pitfall else 0,
                     "patterns_found": report.consolidation.patterns_found,
                     "total": report.total_dream_items,
                     # Targets selected by pick_dream_targets() (graph-structure driven)

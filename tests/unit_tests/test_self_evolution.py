@@ -21,8 +21,15 @@ from contextseek.evolution.conflict import ConflictResolver
 from contextseek.evolution.dreaming import PitfallReflector, _is_failure_trace
 
 
-def _item(content="x", *, stage=Stage.knowledge, source=SourceType.document,
-          confidence=0.8, scope="t/p/s", **kwargs):
+def _item(
+    content="x",
+    *,
+    stage=Stage.knowledge,
+    source=SourceType.document,
+    confidence=0.8,
+    scope="t/p/s",
+    **kwargs,
+):
     defaults = {
         "id": _generate_id(),
         "content": content,
@@ -108,9 +115,7 @@ class TestConflictResolver:
             created_at=_utc_now() - timedelta(days=2),
         )
         new = _item("the server port is 9090", created_at=_utc_now())
-        engine = EvolutionEngine(
-            strategy=EvolutionStrategy(conflict_sim_threshold=0.5)
-        )
+        engine = EvolutionEngine(strategy=EvolutionStrategy(conflict_sim_threshold=0.5))
         _new_items, archived, report = engine.evolve([old, new])
 
         assert report.conflict_updated_count == 1

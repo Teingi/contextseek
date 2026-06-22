@@ -93,9 +93,7 @@ def deserialize_context_item(payload: dict[str, Any]) -> ContextItem:
         valid_from=_str_to_dt(payload["valid_from"])
         if payload.get("valid_from")
         else None,
-        valid_to=_str_to_dt(payload["valid_to"])
-        if payload.get("valid_to")
-        else None,
+        valid_to=_str_to_dt(payload["valid_to"]) if payload.get("valid_to") else None,
         invalidated_reason=payload.get("invalidated_reason"),
     )
     return item
