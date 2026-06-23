@@ -5,8 +5,13 @@ from __future__ import annotations
 import pathlib
 
 from contextseek.daemon.skill_export import _MANIFEST_NAME, export_skills
+from contextseek.domain.serialization import (
+    deserialize_context_item,
+    serialize_context_item,
+)
 from contextseek.domain.context_item import ContextItem, _generate_id
 from contextseek.domain.provenance import Provenance, SourceType
+from contextseek.domain.skill_ir import SkillIR
 from contextseek.domain.stages import Stage
 from contextseek.plugs.skills import _parse_skill_md
 
@@ -17,11 +22,17 @@ from contextseek.plugs.skills import _parse_skill_md
 
 
 def _skill(
-    name: str, body: str = "do the thing", *, confidence: float = 0.8
+    name: str,
+    body: str = "do the thing",
+    *,
+    confidence: float = 0.8,
+    content: dict | None = None,
+    tags: list[str] | None = None,
 ) -> ContextItem:
     return ContextItem(
         id=_generate_id(),
-        content={
+        content=content
+        or {
             "skill_type": "prompt",
             "name": name,
             "description": f"{name} description",
@@ -36,6 +47,7 @@ def _skill(
             confidence=confidence,
         ),
         stage=Stage.skill,
+        tags=tags or [],
     )
 
 
@@ -156,3 +168,67 @@ def test_roundtrip_through_hermes_parser(tmp_path: pathlib.Path) -> None:
     assert parsed["description"] == "Deploy Service description"
     assert "line one" in parsed["body"]
     assert "line two" in parsed["body"]
+
+
+def test_agent_spec_writes_strict_frontmatter(tmp_path: pathlib.Path) -> None:
+    from contextseek.domain.skill_ir import SkillIR
+
+    content = (
+        SkillIR(
+            name="Deploy Service",
+            description="Deploy the service",
+            body="## Overview\n\nstep",
+            tags=["ops"],
+        )
+        .assign_identity("k1")
+        .to_content()
+    )
+    ctx = _StubClient([_skill("Deploy Service", content=content)])
+
+    report = export_skills(ctx, scope="me/work", out_dir=tmp_path, spec="agent")
+    assert report.written == 1
+    md = (tmp_path / "deploy-service" / "SKILL.md").read_text(encoding="utf-8")
+    parsed = _parse_skill_md(md)
+    assert parsed["name"] == "deploy-service"  # agent spec slugifies
+    assert "metadata:" in md
+    assert "\nversion:" not in md.split("---")[1]  # version nested, not top-level
+
+
+def test_needs_review_skill_not_exported(tmp_path: pathlib.Path) -> None:
+    ctx = _StubClient([_skill("Draft Skill", tags=["needs_review"], confidence=0.9)])
+    report = export_skills(ctx, scope="me/work", out_dir=tmp_path)
+    assert report.written == 0
+    assert report.skipped_unpublishable == 1
+    assert not (tmp_path / "draft-skill").exists()
+
+
+def test_export_advances_publish_status_to_published(tmp_path: pathlib.Path) -> None:
+    from contextseek.client.contextseek import ContextSeek
+
+    ctx = ContextSeek()
+    scope = "me/work"
+    ir = SkillIR(
+        name="Deploy Service",
+        description="Deploy safely",
+        body="## Overview\n\nStep 1",
+        publish_status="drafted",
+    ).assign_identity("k1")
+    item = ContextItem(
+        id=_generate_id(),
+        content=ir.to_content(),
+        scope=scope,
+        provenance=Provenance(
+            source_type=SourceType.distillation,
+            source_id="k1",
+            confidence=0.9,
+        ),
+        stage=Stage.skill,
+    )
+    ref = ctx.resolver.ref_for(scope, item.id)
+    ctx.adapter.write(ref, serialize_context_item(item))
+
+    report = export_skills(ctx, scope=scope, out_dir=tmp_path)
+    assert report.written == 1
+
+    stored = deserialize_context_item(ctx.adapter.read(ref))
+    assert SkillIR.from_content(stored.content).publish_status == "published"

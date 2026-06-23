@@ -75,10 +75,11 @@ class TestConsolidationEngine:
         assert result.patterns_found >= 1
         assert len(result.items) >= 1
 
-        # Pattern item should have correct properties
+        # Pattern item should have correct properties. Module 4: a consolidation
+        # pattern is a synthesis that lands directly in the knowledge layer.
         pattern = result.items[0]
-        assert pattern.stage == Stage.extracted
-        assert pattern.stability == Stability.transient
+        assert pattern.stage == Stage.knowledge
+        assert pattern.stability == Stability.stable
         assert "dreamed" in pattern.tags
         assert "consolidation" in pattern.tags
         assert pattern.provenance.source_type == SourceType.dream_consolidation
@@ -505,12 +506,14 @@ class TestDreamItemProperties:
         result = engine.consolidate(items)
         if result.items:
             item = result.items[0]
-            assert item.stage == Stage.extracted
-            assert item.stability == Stability.transient
+            # Module 4: consolidation lands in the knowledge layer as a stable
+            # synthesis with at least knowledge-grade confidence.
+            assert item.stage == Stage.knowledge
+            assert item.stability == Stability.stable
             assert "dreamed" in item.tags
             assert "consolidation" in item.tags
             assert item.provenance.source_type == SourceType.dream_consolidation
-            assert item.provenance.confidence == strategy.dream_initial_confidence
+            assert item.provenance.confidence >= strategy.dream_initial_confidence
 
     def test_divergence_item_properties(self):
         """Divergence items have correct properties and lower confidence."""

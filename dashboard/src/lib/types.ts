@@ -119,10 +119,36 @@ export interface ItemsResponse {
 export type ExpandResponse = ItemsResponse;
 export type UpstreamResponse = ItemsResponse;
 
+export interface ConversionStat {
+  attempted: number;
+  succeeded: number;
+  rejected: number;
+}
+
+export interface EvolutionEventDict {
+  event: string;
+  item_id: string;
+  ts: string;
+  from_stage?: string;
+  to_stage?: string;
+  promotion_path?: string;
+  quality_score?: number;
+  lineage_access_count?: number;
+  reject_reason?: string;
+}
+
 export interface CompactResponse {
   merged: number;
   archived: number;
   evolved: number;
+  conflict_updated?: number;
+  conflict_drift?: number;
+  /** Module 5 funnel — present once the backend exposes evolution observability. */
+  stage_distribution?: Record<string, number>;
+  conversion?: Record<string, ConversionStat>;
+  path_distribution?: Record<string, number>;
+  avg_quality_score?: number | null;
+  events?: EvolutionEventDict[];
 }
 
 export interface DreamResponse {

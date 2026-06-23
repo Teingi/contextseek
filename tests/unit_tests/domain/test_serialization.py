@@ -69,3 +69,22 @@ class TestSerialization:
         item = deserialize_context_item(payload)
         assert item.id == "test-id"
         assert item.stage == Stage.raw
+        # New evolution-deepening fields default for legacy payloads.
+        assert item.lineage_access_count == 0
+        assert item.quality_score is None
+        assert item.promotion_path is None
+
+    def test_roundtrip_evolution_fields(self):
+        item = _make_item(
+            lineage_access_count=7,
+            quality_score=0.42,
+            promotion_path="solo",
+        )
+        payload = serialize_context_item(item)
+        assert payload["lineage_access_count"] == 7
+        assert payload["quality_score"] == 0.42
+        assert payload["promotion_path"] == "solo"
+        restored = deserialize_context_item(payload)
+        assert restored.lineage_access_count == 7
+        assert restored.quality_score == 0.42
+        assert restored.promotion_path == "solo"

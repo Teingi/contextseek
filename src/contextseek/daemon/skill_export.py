@@ -22,9 +22,11 @@ import json
 import pathlib
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from contextseek.domain.skill_executor import SkillExporter
+from contextseek.domain.serialization import serialize_context_item
+from contextseek.domain.skill_ir import SkillIR, can_transition
 
 if TYPE_CHECKING:
     from contextseek.client.contextseek import ContextSeek
@@ -38,6 +40,7 @@ class ExportReport:
     unchanged: int = 0
     pruned: int = 0
     skipped_low_confidence: int = 0
+    skipped_unpublishable: int = 0
     out_dir: str = ""
 
 
@@ -69,29 +72,65 @@ def export_skills(
     min_confidence: float = 0.8,
     dry_run: bool = False,
     prune: bool = True,
+    spec: str = "hermes",
 ) -> ExportReport:
     """Write prompt skills in *scope* to ``out_dir/<slug>/SKILL.md``.
 
-    Idempotent: a SKILL.md whose content is unchanged is left untouched.
-    A manifest (``out_dir/.contextseek-export.json``) records which directories
-    this exporter owns, so pruning only removes our own stale exports and never
-    touches hand-authored skills or symlinks placed in the same directory.
+    ``spec`` selects the SKILL.md flavor: ``"hermes"`` (default, legacy
+    frontmatter with version/tags) or ``"agent"`` (strict Anthropic Agent
+    Skills frontmatter; point ``out_dir`` at ``.claude/skills/`` to land
+    directly into a Claude Code / claude.ai skills directory).
+
+    Idempotent: keyed by the skill's stable ``skill_id`` (falling back to the
+    item id for legacy skills), a SKILL.md whose content is unchanged is left
+    untouched. A manifest (``out_dir/.contextseek-export.json``) records which
+    directories this exporter owns, so pruning only removes our own stale
+    exports and never touches hand-authored skills or symlinks in the same dir.
     """
     base = pathlib.Path(out_dir).expanduser()
     report = ExportReport(out_dir=str(base))
     exporter = SkillExporter()
 
+    def persist_item(item: Any) -> None:
+        """Best-effort persistence for clients that expose adapter+resolver."""
+        if dry_run:
+            return
+        adapter = getattr(ctx, "adapter", None)
+        resolver = getattr(ctx, "resolver", None)
+        if adapter is None or resolver is None:
+            return
+        try:
+            ref = resolver.ref_for(scope, item.id)
+            adapter.write(ref, serialize_context_item(item))
+        except Exception:
+            # Export should remain best-effort even if state persistence fails.
+            return
+
     manifest_path = base / _MANIFEST_NAME
     old_manifest = _load_manifest(manifest_path)
 
-    # Filter to confident prompt skills.
+    # Filter to confident, publishable prompt skills. Deprecated or quality-gated
+    # (needs_review) skills must not reach the runtime surface.
     skills = ctx.skills(scope, skill_type="prompt")
     selected = []
     for item in skills:
         if item.provenance.confidence < min_confidence:
             report.skipped_low_confidence += 1
             continue
+        ir = SkillIR.from_content(item.content)
+        if ir.publish_status == "deprecated" or "needs_review" in item.tags:
+            report.skipped_unpublishable += 1
+            continue
+        # Quality-gate/render-check passed by this point → at least validated.
+        if can_transition(ir.publish_status, "validated"):
+            ir.publish_status = "validated"
+            item.content = ir.to_content()
+            persist_item(item)
         selected.append(item)
+
+    render = (
+        exporter.to_agent_skill_md if spec == "agent" else exporter.to_hermes_skill_md
+    )
 
     # Assign collision-free slugs (append id8 when two skills share a slug).
     new_manifest: dict[str, dict[str, str]] = {}
@@ -103,24 +142,35 @@ def export_skills(
             slug = f"{slug}-{item.id[:8]}"
         used_slugs.add(slug)
 
-        md = exporter.to_hermes_skill_md(item)
+        key = SkillIR.from_content(item.content).skill_id or item.id
+        md = render(item)
         digest = _content_hash(md)
-        new_manifest[item.id] = {"slug": slug, "hash": digest}
+        new_manifest[key] = {"slug": slug, "hash": digest}
 
         skill_file = base / slug / "SKILL.md"
-        prev = old_manifest.get(item.id)
+        prev = old_manifest.get(key)
         if (
             prev is not None
             and prev.get("slug") == slug
             and prev.get("hash") == digest
             and skill_file.exists()
         ):
+            ir = SkillIR.from_content(item.content)
+            if can_transition(ir.publish_status, "published"):
+                ir.publish_status = "published"
+                item.content = ir.to_content()
+                persist_item(item)
             report.unchanged += 1
             continue
 
         if not dry_run:
             skill_file.parent.mkdir(parents=True, exist_ok=True)
             skill_file.write_text(md, encoding="utf-8")
+            ir = SkillIR.from_content(item.content)
+            if can_transition(ir.publish_status, "published"):
+                ir.publish_status = "published"
+                item.content = ir.to_content()
+                persist_item(item)
         report.written += 1
 
     # Prune directories we previously owned but no longer export.

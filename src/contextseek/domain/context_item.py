@@ -94,6 +94,22 @@ class ContextItem:
     stability: Stability | None = None
     """Lifecycle policy; None is inferred from ``stage``."""
 
+    lineage_access_count: int = 0
+    """Blood-line cumulative usage, conserved across stage boundaries.
+
+    Unlike ``access_count`` (this item's own hits), this accumulates the usage
+    of every ancestor merged/promoted/distilled into this item, so evolution
+    gates downstream can judge a knowledge/skill by the total demand that
+    produced it instead of starting from zero at each boundary."""
+
+    quality_score: float | None = None
+    """Quality-gate score in [0, 1] assigned at each promotion hop; below the
+    gate threshold the item is tagged ``needs_review``. None means not scored."""
+
+    promotion_path: str | None = None
+    """How this item was promoted: ``extract`` / ``converge`` / ``solo`` /
+    ``llm`` / ``heuristic``. Used for observability attribution."""
+
     # ═══════════════════════════════════════════
     # Lifecycle (system-managed)
     # ═══════════════════════════════════════════
@@ -171,8 +187,14 @@ class ContextItem:
         return str(self.content)
 
     def touch(self) -> None:
-        """Record an access."""
+        """Record an access.
+
+        Both ``access_count`` (own hits) and ``lineage_access_count`` (blood-line
+        total) advance so that usage signal is conserved when this item is later
+        merged or promoted into a higher stage.
+        """
         self.access_count += 1
+        self.lineage_access_count += 1
         self.last_accessed_at = _utc_now()
 
     def soft_delete(self, reason: str | None = None) -> None:

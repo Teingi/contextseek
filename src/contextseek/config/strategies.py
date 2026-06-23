@@ -121,6 +121,24 @@ class EvolutionStrategy:
     heuristic_distill_min_use: int = 5
     heuristic_distill_min_age_days: float = 3.0
     heuristic_distill_min_boost: float = 1.1
+    # ── Evolution-deepening P0 (signal loop, multi-path promotion, quality gate) ──
+    # Module 0 — signal attribution at retrieve time. off | inject | cited.
+    usage_attribution_mode: str = "inject"
+    inject_relevance_boost_step: float = 0.02
+    # Module 1 — age fallback so write-once text raw never stalls forever.
+    text_extract_max_age_days: float = 7.0
+    # Module 2 — solo promotion path (isolated high-value extracted → knowledge).
+    solo_promote_enabled: bool = True
+    solo_promote_min_lineage_access: int = 3
+    solo_promote_min_boost: float = 1.1
+    solo_promote_min_age_days: float = 1.0
+    # Module 2 — small-cluster convergence ("2 items + high similarity").
+    small_cluster_size: int = 2
+    small_cluster_similarity: float = 0.85
+    # Module 3 — forbid raw → skill direct jump in the heuristic side-path.
+    heuristic_distill_allow_raw: bool = False
+    # Quality gate — minimum content length for a knowledge item to pass.
+    knowledge_quality_min_len: int = 20
 
 
 @dataclass(frozen=True)

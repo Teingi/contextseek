@@ -66,3 +66,5 @@ examples/demo/.env
 examples/demo/.contextseek/
 examples/demo/__pycache__/
 examples/demo/.langgraph_api
+
+docs/design/

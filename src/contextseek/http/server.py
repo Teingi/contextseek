@@ -1044,6 +1044,13 @@ def create_app(client: ContextSeek | None = None) -> FastAPI:
             "evolved": report.evolved_count,
             "conflict_updated": report.conflict_updated_count,
             "conflict_drift": report.conflict_drift_count,
+            # Module 5 funnel: inventory, per-hop conversion, path mix, quality,
+            # and the §8.1 promotion events so the dashboard can locate断点.
+            "stage_distribution": report.stage_distribution,
+            "conversion": report.conversion,
+            "path_distribution": report.path_distribution,
+            "avg_quality_score": report.avg_quality_score,
+            "events": [e.to_dict() for e in report.events],
         }
 
     @app.post("/dream")

@@ -77,10 +77,16 @@ def test_m1_to_m3_context_flow() -> None:
     assert matched_full[0].item.content_text.startswith("deployment budget sentinel")
 
     item_ref = ctx.resolver.ref_for(scope, long_item.id)
+    # Capture boost before feedback: retrieve() in inject mode (module 0 signal
+    # loop) already applied small per-injection boosts, so assert the feedback
+    # *delta* rather than an absolute value.
+    before_item = ctx._read_item(item_ref)
+    assert before_item is not None
+    boost_before = before_item.relevance_boost
     ctx.feedback(item_ref, scope=scope, score=0.5, reason="accepted")
     updated_item = ctx._read_item(item_ref)
     assert updated_item is not None
-    assert updated_item.relevance_boost == 1.5
+    assert abs(updated_item.relevance_boost - (boost_before + 0.5)) < 1e-9
     assert updated_item.access_count >= 1
 
     raw_trace = ctx.add(
@@ -105,3 +111,71 @@ def test_m1_to_m3_context_flow() -> None:
     extracted_ref = ctx.resolver.ref_for(scope, extracted[0].id)
     chain = ctx.upstream(extracted_ref, scope=scope)
     assert [item.id for item in chain] == [extracted[0].id, raw_trace.id]
+
+
+def test_signal_loop_drives_extraction_without_manual_feedback() -> None:
+    """Module 0 end-to-end: pure retrieval (no feedback()) supplies the fuel
+    (access_count + boost) that lets a plain-text raw item reach extracted."""
+    scope = "acme/bot/signal_loop"
+    ctx = ContextSeek(evolution_engine=EvolutionEngine())
+
+    item = ctx.add(
+        "remember to rotate the staging database credentials every release",
+        scope=scope,
+        source="note://ops",
+        source_type=SourceType.external_api,
+    )
+    assert item.stage == Stage.raw
+    item_ref = ctx.resolver.ref_for(scope, item.id)
+
+    # Retrieve several times — inject-mode attribution accrues access + boost.
+    for _ in range(4):
+        ctx.retrieve("rotate database credentials", scope=scope, k=5)
+
+    fueled = ctx._read_item(item_ref)
+    assert fueled is not None
+    assert fueled.access_count >= 3  # text_extract_min_access default
+    assert fueled.lineage_access_count >= 3
+    assert fueled.relevance_boost > 1.0  # injection boosts accumulated
+
+    report = ctx.compact(scope=scope)
+    assert report.evolved_count > 0
+    extracted = list(ctx.items(scope=scope, stage=Stage.extracted))
+    assert extracted, "pure-retrieval signal loop should drive raw → extracted"
+
+
+def test_compact_flushes_evolution_metrics_to_audit() -> None:
+    """Module 5: compact() writes the funnel (stage inventory + conversion +
+    events) into the audit sink and emits Prometheus-exportable metric points."""
+    from contextseek.observability.audit import AuditLog
+
+    scope = "acme/bot/observability"
+    audit = AuditLog()
+    ctx = ContextSeek(evolution_engine=EvolutionEngine(), audit_log=audit)
+
+    ctx.add(
+        "rotate the staging database credentials before every production release",
+        scope=scope,
+        source="note://ops",
+        source_type=SourceType.external_api,
+    )
+    for _ in range(4):
+        ctx.retrieve("rotate credentials", scope=scope, k=5)
+
+    ctx.compact(scope=scope)
+
+    record = audit.latest(action="compact")
+    assert record is not None
+    detail = record.detail
+    assert "stage_distribution" in detail
+    assert "conversion" in detail
+    assert "events" in detail and detail["events"]
+    # Funnel metrics are exportable for the dashboard.
+    metric_names = {m.name for m in record.metrics}
+    assert "evolution_stage_inventory" in metric_names
+    assert "evolution_conversion_rate" in metric_names
+
+    # The retrieve path recorded usage_recorded events (module 0 attribution).
+    retrieve_rec = audit.latest(action="retrieve")
+    assert retrieve_rec is not None
+    assert retrieve_rec.detail.get("usage_events")

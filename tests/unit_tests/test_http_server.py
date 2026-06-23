@@ -176,6 +176,11 @@ def test_http_compact_returns_conflict_counts() -> None:
         evolved_count=3,
         conflict_updated_count=4,
         conflict_drift_count=5,
+        stage_distribution={"extracted": 2},
+        conversion={"raw->extracted": {"attempted": 2, "succeeded": 1, "rejected": 1}},
+        path_distribution={"extract": 1},
+        avg_quality_score=0.5,
+        events=[],
     )
     app = create_app(client=ctx)
 
@@ -196,6 +201,13 @@ def test_http_compact_returns_conflict_counts() -> None:
         "evolved": 3,
         "conflict_updated": 4,
         "conflict_drift": 5,
+        "stage_distribution": {"extracted": 2},
+        "conversion": {
+            "raw->extracted": {"attempted": 2, "succeeded": 1, "rejected": 1}
+        },
+        "path_distribution": {"extract": 1},
+        "avg_quality_score": 0.5,
+        "events": [],
     }
 
 

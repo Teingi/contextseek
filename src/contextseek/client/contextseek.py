@@ -659,9 +659,37 @@ class ContextSeek:
         hits = hits[:k]
 
         # Touch hits (access stats) on the raw items before swapping content.
+        # Module 0 signal loop:
+        # - inject: retrieval injection counts as usage and gets a small boost.
+        # - cited: retrieval only touches access; boost waits for "actually used"
+        #   evidence in record_utility().
+        # - off: legacy touch-only behavior.
+        attribution_mode, boost_step = self._usage_attribution()
+        usage_events: list[dict[str, Any]] = []
+        now_iso = _utc_now().isoformat()
         for h in hits:
             h.item.touch()
+            delta_boost = 0.0
+            if attribution_mode == "inject" and boost_step:
+                before = h.item.relevance_boost
+                h.item.relevance_boost = min(5.0, before + boost_step)
+                delta_boost = round(h.item.relevance_boost - before, 6)
             self._write_item(h.item)
+            # Module 0 / §8.1: each injection is a usage signal. Record it so the
+            # signal loop is auditable end-to-end, not just observable as drift
+            # in access_count.
+            if attribution_mode == "inject":
+                usage_events.append(
+                    {
+                        "event": "usage_recorded",
+                        "item_id": h.item.id,
+                        "scope": scope,
+                        "attribution_type": attribution_mode,
+                        "delta_access": 1,
+                        "delta_boost": delta_boost,
+                        "ts": now_iso,
+                    }
+                )
 
         # full=False: clear content and expose only the L1 summary;
         # when a hit lacks a summary (non-tiered mode), keep the item and mark layer "full".
@@ -707,6 +735,8 @@ class ContextSeek:
                 "full": full,
                 "hits": len(hits),
                 "layer": response_layer,
+                "attribution_mode": attribution_mode,
+                "usage_events": usage_events,
             },
         )
 
@@ -1299,6 +1329,7 @@ class ContextSeek:
         if score > 0:
             # Positive feedback counts as "usage" — accelerates distillation
             item.access_count += 1
+            item.lineage_access_count += 1
             item.last_accessed_at = _utc_now()
             # High cumulative boost → tag for promotion
             if new_boost >= 2.0 and "evolution_candidate" not in item.tags:
@@ -1368,6 +1399,9 @@ class ContextSeek:
         rewarded = 0
         penalized = 0
         now = _utc_now()
+        attribution_mode, _boost_step = self._usage_attribution()
+        usage_events: list[dict[str, Any]] = []
+        now_iso = now.isoformat()
 
         for item_id in dict.fromkeys(retrieved_ids):  # dedupe, preserve order
             ref = self.resolver.ref_for(scope, item_id)
@@ -1377,8 +1411,12 @@ class ContextSeek:
             item = deserialize_context_item(payload)
 
             if item_id in used:
+                before_boost = item.relevance_boost
                 item.relevance_boost = max(0.1, min(5.0, item.relevance_boost + reward))
                 item.access_count += 1
+                # Conserve the blood-line signal too, so this usage still fuels
+                # the downstream promotion gates after the item evolves.
+                item.lineage_access_count += 1
                 item.last_accessed_at = now
                 item.importance = min(5.0, item.importance + reward * 0.2)
                 if (
@@ -1387,12 +1425,41 @@ class ContextSeek:
                 ):
                     item.tags.append("evolution_candidate")
                 rewarded += 1
+                if attribution_mode == "cited":
+                    usage_events.append(
+                        {
+                            "event": "usage_recorded",
+                            "item_id": item.id,
+                            "scope": scope,
+                            "attribution_type": "cited",
+                            "delta_access": 1,
+                            "delta_boost": round(
+                                item.relevance_boost - before_boost, 6
+                            ),
+                            "ts": now_iso,
+                        }
+                    )
             elif decay_unused:
+                before_boost = item.relevance_boost
                 item.relevance_boost = max(
                     0.1, min(5.0, item.relevance_boost - penalty)
                 )
                 item.importance = max(0.1, item.importance * (1.0 - penalty * 0.2))
                 penalized += 1
+                if attribution_mode == "cited":
+                    usage_events.append(
+                        {
+                            "event": "usage_recorded",
+                            "item_id": item.id,
+                            "scope": scope,
+                            "attribution_type": "negative",
+                            "delta_access": 0,
+                            "delta_boost": round(
+                                item.relevance_boost - before_boost, 6
+                            ),
+                            "ts": now_iso,
+                        }
+                    )
             else:
                 continue
 
@@ -1407,6 +1474,8 @@ class ContextSeek:
                 "used": len(used),
                 "rewarded": rewarded,
                 "penalized": penalized,
+                "attribution_mode": attribution_mode,
+                "usage_events": usage_events,
             },
         )
         return {"rewarded": rewarded, "penalized": penalized}
@@ -1484,7 +1553,14 @@ class ContextSeek:
                     "archived": len(archived_items),
                     "merged": report.merged_count,
                     "evolved": report.evolved_count,
+                    # Module 5 funnel + §8.1 events, persisted via the audit sink.
+                    "stage_distribution": report.stage_distribution,
+                    "conversion": report.conversion,
+                    "path_distribution": report.path_distribution,
+                    "avg_quality_score": report.avg_quality_score,
+                    "events": [e.to_dict() for e in report.events],
                 },
+                metrics=self._evolution_metrics(report),
             )
 
             return report
@@ -1899,6 +1975,133 @@ class ContextSeek:
         prompt_items = self.skills(scope, skill_type="prompt", query=query, k=k)
         return exporter.to_system_prompt(prompt_items)
 
+    def _find_skill_item(self, scope: str, skill_id: str) -> ContextItem | None:
+        """Locate a skill-stage item by its stable ``skill_id`` within a scope."""
+        for it in self.items(scope=scope, stage=Stage.skill):
+            if isinstance(it.content, dict) and it.content.get("skill_id") == skill_id:
+                return it
+        return None
+
+    def note_skill_selected(
+        self,
+        *,
+        scope: str,
+        skill_id: str,
+        target: str = "mcp",
+        reason: str = "",
+        confidence: float | None = None,
+    ) -> None:
+        """Record that a runtime selected/served a skill (§8.1 ``skill_selected``).
+
+        Closes the first half of the runtime loop: knowing a skill is actually
+        consumed (not merely exported) is what distinguishes a live skill from a
+        dead artifact. Emitted whenever the MCP server serves a prompt skill or a
+        client invokes a live tool skill.
+        """
+        self._emit_audit(
+            action="skill_selected",
+            scope=scope,
+            detail={
+                "skill_id": skill_id,
+                "target": target,
+                "selection_reason": reason,
+                "confidence": confidence,
+            },
+        )
+
+    def skill_feedback(
+        self,
+        *,
+        scope: str,
+        skill_id: str,
+        outcome: str,
+        target: str = "mcp",
+        latency_ms: float | None = None,
+        error_type: str | None = None,
+        reason: str = "",
+        reward: float = 0.1,
+        penalty: float = 0.1,
+        deprecate_floor: float = 0.3,
+    ) -> dict[str, Any]:
+        """Ingest a runtime execution outcome and feed it back into evolution.
+
+        Completes the publish→call→writeback→re-evolve loop (§8.1
+        ``skill_executed`` + ``skill_feedback_ingested``):
+
+        - ``outcome == "success"`` raises the skill's ``relevance_boost`` and
+          ticks access (which feeds re-distillation), so well-performing skills
+          rank higher and stay published.
+        - any other outcome lowers the boost; a skill that decays to/below
+          ``deprecate_floor`` is marked ``publish_status="deprecated"`` and
+          ``needs_review`` so it drops off the publish surface.
+
+        Because outcomes can come from external tools/network/user input rather
+        than the skill itself, boost steps are deliberately small and an explicit
+        ``feedback()`` can always override.
+
+        Raises:
+            ValueError: when no skill with ``skill_id`` exists in ``scope``.
+        """
+        from contextseek.domain.skill_ir import SkillIR
+
+        item = self._find_skill_item(scope, skill_id)
+        if item is None:
+            raise ValueError(f"skill not found: {skill_id}")
+
+        before = item.relevance_boost
+        if outcome == "success":
+            item.relevance_boost = min(5.0, before + reward)
+            item.access_count += 1
+            item.lineage_access_count += 1
+            item.last_accessed_at = _utc_now()
+        else:
+            item.relevance_boost = max(0.1, before - penalty)
+        delta_boost = round(item.relevance_boost - before, 6)
+
+        deprecated = False
+        if outcome != "success" and item.relevance_boost <= deprecate_floor:
+            ir = SkillIR.from_content(item.content)
+            if ir.publish_status != "deprecated":
+                ir.publish_status = "deprecated"
+                item.content = ir.to_content()
+                if "needs_review" not in item.tags:
+                    item.tags.append("needs_review")
+                deprecated = True
+        item.updated_at = _utc_now()
+
+        ref = self.resolver.ref_for(scope, item.id)
+        self.adapter.write(ref, serialize_context_item(item))
+
+        self._emit_audit(
+            action="skill_executed",
+            scope=scope,
+            detail={
+                "skill_id": skill_id,
+                "target": target,
+                "outcome": outcome,
+                "latency_ms": latency_ms,
+                "error_type": error_type,
+            },
+        )
+        self._emit_audit(
+            action="skill_feedback_ingested",
+            scope=scope,
+            detail={
+                "skill_id": skill_id,
+                "target": target,
+                "outcome": outcome,
+                "delta_boost": delta_boost,
+                "deprecated": deprecated,
+                "reason": reason,
+            },
+        )
+        return {
+            "skill_id": skill_id,
+            "delta_boost": delta_boost,
+            "deprecated": deprecated,
+            "relevance_boost": item.relevance_boost,
+        }
+
     def dream(
         self,
         *,
@@ -2024,77 +2227,168 @@ class ContextSeek:
         new_instance = replace(self, _strategy_version=version)
         return new_instance
 
+    @staticmethod
+    def _assemble_evolution_engine(
+        evolution_strategy: Any,
+        *,
+        extractor: Any,
+        summarizer: Any | None = None,
+        merge_synthesize_fn: Any | None = None,
+        distill_decide_fn: Any | None = None,
+        distill_render_fn: Any | None = None,
+        promote_decide_fn: Any | None = None,
+    ) -> Any:
+        """Single construction site for ``EvolutionEngine``.
+
+        Both ``from_config`` and ``from_settings`` route through here so the two
+        factories cannot drift apart on which kwargs they wire (G6). Callers that
+        have no LLM simply omit the optional fns and pass a strategy + extractor.
+        """
+        from contextseek.evolution.engine import EvolutionEngine
+
+        return EvolutionEngine(
+            extractor=extractor,
+            strategy=evolution_strategy,
+            merge_synthesize_fn=merge_synthesize_fn,
+            distill_decide_fn=distill_decide_fn,
+            distill_render_fn=distill_render_fn,
+            promote_decide_fn=promote_decide_fn,
+            summarizer=summarizer,
+        )
+
     @classmethod
     def from_runtime_config(cls, path: str | None = None) -> "ContextSeek":
-        """Factory: create a ContextSeek from a runtime config file.
+        """Factory: create a ContextSeek from a JSON runtime config file.
 
-        Loads adapter, resolver, embedder, evolution engine, and audit
-        log settings from a JSON/YAML configuration file.
+        Thin wrapper over :meth:`from_settings` (G6 — single assembly path): the
+        JSON's ``adapter`` / ``evolution`` / ``audit`` sections override the
+        matching ``ContextSeekSettings`` blocks, while embedder / LLM / summarizer
+        and any unspecified strategy fields resolve from the environment exactly
+        as ``from_settings`` does. There is no longer a parallel, weaker assembly.
 
         Args:
-            path: Path to config file. If None, uses defaults.
+            path: Path to config file. If None or missing, falls back to the
+                environment-driven defaults (still via ``from_settings``).
 
         Returns:
-            Configured ContextSeek instance.
+            Fully configured ContextSeek instance.
         """
-        if path is None:
-            return cls()
-
         from pathlib import Path as FilePath
 
+        # No file → still go through the single assembly path so environment
+        # storage/embedding/LLM/evolution settings are honored (not a bare cls()).
+        if path is None:
+            return cls.from_settings()
         config_path = FilePath(path)
         if not config_path.exists():
-            return cls()
+            return cls.from_settings()
 
         config = json.loads(config_path.read_text(encoding="utf-8"))
 
-        # Build adapter
-        adapter: SeekVFSAdapter | None = None
-        adapter_config = config.get("adapter")
-        if adapter_config:
-            adapter_type = adapter_config.get("type", "in_memory")
-            if adapter_type == "in_memory":
-                adapter = _make_default_adapter()
-            elif adapter_type == "file":
-                from contextseek.storage.file_backend import FileBackend
-                from contextseek.storage.storage_adapter import SeekVFSStorageAdapter
-                from seekvfs import VFS
-
-                backend = FileBackend(root=adapter_config.get("root", ".contextseek"))
-                vfs = VFS(
-                    routes={"contextseek://": {"backend": backend}},
-                    scheme="contextseek://",
-                )
-                adapter = SeekVFSStorageAdapter(vfs)
-
-        # Build resolver
-        uri_scheme = config.get("uri_scheme", "contextseek://")
-        resolver = ScopeResolver(uri_scheme=uri_scheme)
-
-        # Build audit log
-        audit_log = None
-        audit_config = config.get("audit")
-        if audit_config and audit_config.get("enabled", False):
-            from contextseek.observability.audit import AuditLog
-
-            audit_log = AuditLog(
-                persist_path=audit_config.get("persist_path"),
-                metrics_path=audit_config.get("metrics_path"),
-            )
-
-        # Build evolution engine
-        evolution_engine = None
-        if config.get("evolution", {}).get("enabled", False):
-            from contextseek.evolution.engine import EvolutionEngine
-
-            evolution_engine = EvolutionEngine()
-
-        return cls(
-            adapter=adapter,
-            resolver=resolver,
-            audit_log=audit_log,
-            evolution_engine=evolution_engine,
+        # G6: map this JSON onto ContextSeekSettings and delegate to the single
+        # fully-wired factory (from_settings), instead of a parallel, weaker
+        # assembly. Every section not present in the JSON (embedding / llm /
+        # summarizer / ...) still resolves from the environment, so config-dict
+        # users get the same embedder/LLM/summarizer/strategy pipeline as everyone
+        # else. Both config shapes are accepted:
+        #   - legacy: {"adapter": {"type", "root"}, "evolution": {...}, "audit": {...}}
+        #   - RuntimeConfig (config/runtime.py, the exported schema):
+        #     {"backend", "storage_path", "uri_scheme", "cold_backend",
+        #      "strategy": {"evolution": {...}, "observability": {...}}, "ob_*"}
+        from contextseek.config.settings import (
+            ContextSeekSettings,
+            EmbeddingSettings,
+            EvolutionSettings,
+            ObservabilitySettings,
+            OceanBaseSettings,
+            StorageSettings,
         )
+
+        settings_kwargs: dict[str, Any] = {}
+        adapter_config = config.get("adapter") or {}
+        strategy_config = config.get("strategy") or {}
+
+        # ── Storage: RuntimeConfig `backend`/`storage_path` win, else legacy adapter.
+        storage_kwargs: dict[str, Any] = {}
+        backend = config.get("backend")
+        if not backend:
+            atype = adapter_config.get("type")
+            backend = {"in_memory": "memory", "file": "file"}.get(atype)
+        if backend:
+            storage_kwargs["backend"] = backend
+        path_val = config.get("storage_path") or adapter_config.get("root")
+        if path_val:
+            storage_kwargs["path"] = path_val
+        if config.get("uri_scheme"):
+            storage_kwargs["uri_scheme"] = config["uri_scheme"]
+        if config.get("cold_backend"):
+            storage_kwargs["cold_backend"] = config["cold_backend"]
+            if config.get("cold_storage_path"):
+                storage_kwargs["cold_path"] = config["cold_storage_path"]
+        if storage_kwargs:
+            settings_kwargs["storage"] = StorageSettings(**storage_kwargs)
+
+        # ── Evolution: merge strategy.evolution (RuntimeConfig) with top-level
+        # evolution (legacy); the legacy form's explicit keys take precedence.
+        evolution_cfg: dict[str, Any] = {}
+        evolution_cfg.update(strategy_config.get("evolution") or {})
+        evolution_cfg.update(config.get("evolution") or {})
+        if evolution_cfg:
+            evo_valid = set(EvolutionSettings.model_fields)
+            evo_kwargs = {k: v for k, v in evolution_cfg.items() if k in evo_valid}
+            # RuntimeConfig's EvolutionStrategy has no `enabled` flag, so configuring
+            # evolution there signals intent to run it — enable unless told otherwise.
+            if "enabled" not in evo_kwargs and (strategy_config.get("evolution")):
+                evo_kwargs["enabled"] = True
+            settings_kwargs["evolution"] = EvolutionSettings(**evo_kwargs)
+
+        # ── Observability: legacy `audit` block or RuntimeConfig strategy.observability.
+        obs_kwargs: dict[str, Any] = {}
+        obs_src = strategy_config.get("observability") or {}
+        if obs_src.get("persist_audit"):
+            obs_kwargs["audit_enabled"] = True
+        if obs_src.get("audit_path"):
+            obs_kwargs["audit_path"] = obs_src["audit_path"]
+        if obs_src.get("metrics_path"):
+            obs_kwargs["metrics_enabled"] = True
+            obs_kwargs["metrics_path"] = obs_src["metrics_path"]
+        audit_config = config.get("audit") or {}
+        if audit_config.get("enabled"):
+            obs_kwargs["audit_enabled"] = True
+        if audit_config.get("persist_path"):
+            obs_kwargs["audit_path"] = audit_config["persist_path"]
+        if audit_config.get("metrics_path"):
+            obs_kwargs["metrics_enabled"] = True
+            obs_kwargs["metrics_path"] = audit_config["metrics_path"]
+        if obs_kwargs:
+            settings_kwargs["observability"] = ObservabilitySettings(**obs_kwargs)
+
+        # ── OceanBase connection params (RuntimeConfig form). ``ob_vector_dims``
+        # maps to embedding.dims (which _build_adapter_from_settings requires for
+        # oceanbase); the embedding provider/model still resolve from the env, so
+        # only the dimension is overridden, not the whole embedder.
+        if backend == "oceanbase":
+            ob_map = {
+                "ob_host": "host",
+                "ob_port": "port",
+                "ob_user": "user",
+                "ob_password": "password",
+                "ob_db_name": "db_name",
+                "ob_table_name": "table_name",
+            }
+            ob_kwargs = {
+                dst: config[src]
+                for src, dst in ob_map.items()
+                if config.get(src) is not None
+            }
+            if ob_kwargs:
+                settings_kwargs["ob"] = OceanBaseSettings(**ob_kwargs)
+            if config.get("ob_vector_dims"):
+                settings_kwargs["embedding"] = EmbeddingSettings(
+                    dims=int(config["ob_vector_dims"])
+                )
+
+        return cls.from_settings(ContextSeekSettings(**settings_kwargs))
 
     @classmethod
     def from_settings(
@@ -2218,19 +2512,19 @@ class ContextSeek:
         )
         dream_llm_enabled = bool(shared_llm is not None and settings.dream.llm_enabled)
 
-        # 4. Build evolution engine
+        # 4. Build evolution engine via the shared assembly (see from_config).
         evolution_engine = None
         if settings.evolution.enabled:
-            from contextseek.evolution.engine import EvolutionEngine
             from contextseek.evolution.extractor import HeuristicExtractor, LLMExtractor
 
             extractor = HeuristicExtractor()
             if summarizer is not None:
                 extractor = LLMExtractor(summarize_fn=summarizer.summary)
 
-            evolution_engine = EvolutionEngine(
+            evolution_engine = cls._assemble_evolution_engine(
+                strategy.evolution,
                 extractor=extractor,
-                strategy=strategy.evolution,
+                summarizer=summarizer,
                 merge_synthesize_fn=(
                     cls._static_merge_synthesis_prompt(shared_llm, llm_prompts)
                     if llm_merge_enabled
@@ -2246,7 +2540,6 @@ class ContextSeek:
                     if llm_distill_enabled
                     else None
                 ),
-                summarizer=summarizer,
             )
 
         # 5. Build audit log
@@ -2620,6 +2913,7 @@ class ContextSeek:
         scope: str,
         detail: dict[str, Any],
         status: str = "ok",
+        metrics: list[Any] | None = None,
     ) -> None:
         """Emit an audit record if audit_log is configured."""
         if self.audit_log is None:
@@ -2635,12 +2929,69 @@ class ContextSeek:
             policy_version=self._strategy_version,
             status=status,
             detail=detail,
+            metrics=list(metrics) if metrics else [],
             actor=dict(ctx.get("actor", {})),
             request=dict(ctx.get("request", {})),
             source=ctx.get("source"),
             reason=ctx.get("reason"),
         )
         self.audit_log.append(record)
+
+    @staticmethod
+    def _evolution_metrics(report: CompactReport) -> list[Any]:
+        """Flatten a CompactReport's funnel into Prometheus-exportable points.
+
+        Emits per-stage inventory (滞留量), per-hop attempted/succeeded/rejected
+        and the derived conversion rate (转化率), and the cycle's mean quality
+        score — the module-5 signals the evolution-funnel dashboard reads.
+        """
+        from contextseek.observability.audit import MetricPoint
+
+        points: list[Any] = []
+        for stage, count in report.stage_distribution.items():
+            points.append(
+                MetricPoint(
+                    name="evolution_stage_inventory",
+                    value=float(count),
+                    tags={"stage": stage},
+                )
+            )
+        for hop, stats in report.conversion.items():
+            attempted = stats.get("attempted", 0)
+            for key in ("attempted", "succeeded", "rejected"):
+                points.append(
+                    MetricPoint(
+                        name=f"evolution_promotion_{key}",
+                        value=float(stats.get(key, 0)),
+                        tags={"hop": hop},
+                    )
+                )
+            rate = stats.get("succeeded", 0) / attempted if attempted else 0.0
+            points.append(
+                MetricPoint(
+                    name="evolution_conversion_rate",
+                    value=round(rate, 4),
+                    unit="ratio",
+                    tags={"hop": hop},
+                )
+            )
+        for path, count in report.path_distribution.items():
+            points.append(
+                MetricPoint(
+                    name="evolution_promotion_path",
+                    value=float(count),
+                    tags={"path": path},
+                )
+            )
+        if report.avg_quality_score is not None:
+            points.append(
+                MetricPoint(
+                    name="evolution_avg_quality_score",
+                    value=float(report.avg_quality_score),
+                    unit="score",
+                )
+            )
+        return points
 
     def _retrieval_strategy(self):
         """Return the active retrieval strategy, falling back to defaults."""
@@ -2650,6 +3001,21 @@ class ContextSeek:
         from contextseek.config import RetrievalStrategy
 
         return RetrievalStrategy()
+
+    def _usage_attribution(self) -> tuple[str, float]:
+        """Return (mode, boost_step) for retrieve-time signal attribution.
+
+        Defaults to ("inject", 0.02) so the signal loop is active even without an
+        explicit strategy. ``mode`` is one of off | inject | cited:
+        - inject: retrieve-time attribution
+        - cited: usage attribution in record_utility() only
+        """
+        evo = getattr(self.strategy, "evolution", None) if self.strategy else None
+        mode = str(getattr(evo, "usage_attribution_mode", "inject") or "inject")
+        if mode not in {"off", "inject", "cited"}:
+            mode = "inject"
+        step = getattr(evo, "inject_relevance_boost_step", 0.02)
+        return mode, step
 
     def _filter_readable_hits(
         self, hits: list[SearchHit], *, scope: str

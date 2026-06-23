@@ -133,6 +133,11 @@ const zh: Dict = {
   "evolution.dream": "Dream",
   "evolution.compactResult": "Compact 结果",
   "evolution.dreamResult": "Dream 结果",
+  "evolution.funnel": "演进漏斗",
+  "evolution.avgQuality": "平均质量分",
+  "evolution.rate": "转化率（晋级 / 候选）",
+  "evolution.paths": "晋级路径分布",
+  "evolution.rejections": "未晋级原因",
 
   // provenance
   "provenance.back": "返回",
@@ -443,6 +448,11 @@ const en: Dict = {
   "evolution.dream": "Dream",
   "evolution.compactResult": "Compact result",
   "evolution.dreamResult": "Dream result",
+  "evolution.funnel": "Evolution funnel",
+  "evolution.avgQuality": "Avg quality",
+  "evolution.rate": "Conversion rate (promoted / candidates)",
+  "evolution.paths": "Promotion paths",
+  "evolution.rejections": "Rejection reasons",
 
   "provenance.back": "Back",
   "provenance.depth": "max_depth",
@@ -747,6 +757,11 @@ const ja: Dict = {
   "evolution.dream": "Dream",
   "evolution.compactResult": "Compact 結果",
   "evolution.dreamResult": "Dream 結果",
+  "evolution.funnel": "進化ファネル",
+  "evolution.avgQuality": "平均品質スコア",
+  "evolution.rate": "変換率（昇格 / 候補）",
+  "evolution.paths": "昇格パス分布",
+  "evolution.rejections": "未昇格の理由",
 
   "provenance.back": "戻る",
   "provenance.depth": "max_depth",

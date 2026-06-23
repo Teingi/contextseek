@@ -327,6 +327,26 @@ class EvolutionSettings(BaseSettings):
     """Minimum item age in days before heuristic distillation."""
     heuristic_distill_min_boost: float = 1.1
     """Minimum relevance_boost for heuristic skill distillation."""
+    # ── Evolution-deepening P0 ──
+    usage_attribution_mode: str = "inject"
+    """Signal attribution at retrieve time: off | inject | cited."""
+    inject_relevance_boost_step: float = 0.02
+    """relevance_boost increment applied per injection under inject/cited mode."""
+    text_extract_max_age_days: float = 7.0
+    """Age fallback: write-once text raw is extracted once past this age."""
+    solo_promote_enabled: bool = True
+    """Allow isolated high-value extracted items to promote to knowledge."""
+    solo_promote_min_lineage_access: int = 3
+    solo_promote_min_boost: float = 1.1
+    solo_promote_min_age_days: float = 1.0
+    small_cluster_size: int = 2
+    """Cluster size for the small-cluster convergence mode."""
+    small_cluster_similarity: float = 0.85
+    """Similarity threshold for the small-cluster convergence mode."""
+    heuristic_distill_allow_raw: bool = False
+    """Whether raw items may be heuristically distilled directly (default off)."""
+    knowledge_quality_min_len: int = 20
+    """Minimum content length for a knowledge item to pass the quality gate."""
 
 
 class DreamSettings(BaseSettings):
@@ -547,6 +567,17 @@ def to_strategy_config(settings: ContextSeekSettings) -> "StrategyConfig":
             heuristic_distill_min_use=settings.evolution.heuristic_distill_min_use,
             heuristic_distill_min_age_days=settings.evolution.heuristic_distill_min_age_days,
             heuristic_distill_min_boost=settings.evolution.heuristic_distill_min_boost,
+            usage_attribution_mode=settings.evolution.usage_attribution_mode,
+            inject_relevance_boost_step=settings.evolution.inject_relevance_boost_step,
+            text_extract_max_age_days=settings.evolution.text_extract_max_age_days,
+            solo_promote_enabled=settings.evolution.solo_promote_enabled,
+            solo_promote_min_lineage_access=settings.evolution.solo_promote_min_lineage_access,
+            solo_promote_min_boost=settings.evolution.solo_promote_min_boost,
+            solo_promote_min_age_days=settings.evolution.solo_promote_min_age_days,
+            small_cluster_size=settings.evolution.small_cluster_size,
+            small_cluster_similarity=settings.evolution.small_cluster_similarity,
+            heuristic_distill_allow_raw=settings.evolution.heuristic_distill_allow_raw,
+            knowledge_quality_min_len=settings.evolution.knowledge_quality_min_len,
         ),
         dream=DreamStrategy(
             llm_enabled=settings.dream.llm_enabled,

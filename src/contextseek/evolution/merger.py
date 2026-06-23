@@ -6,6 +6,7 @@ Migrated from policies/memory.py and adapted for ContextItem.
 from __future__ import annotations
 
 import math
+import warnings
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -69,12 +70,20 @@ class ConvergenceMerger:
         embedder: Callable[[str], list[float]] | None = None,
         half_life_days: float = 7.0,
         synthesize_fn: Callable[[list[str]], str] | None = None,
+        small_cluster_size: int = 2,
+        small_cluster_similarity: float = 0.85,
     ):
         self._threshold = similarity_threshold
         self._min_cluster = min_cluster_size
         self._embedder = embedder
         self._half_life = half_life_days
         self._synthesize = synthesize_fn
+        # Small-cluster mode: accept a smaller cluster when its members are
+        # highly similar, so a pair of near-identical insights can still
+        # converge without waiting for a full min_cluster_size cluster.
+        self._small_cluster = max(2, small_cluster_size)
+        self._small_cluster_sim = small_cluster_similarity
+        self._warned_no_embedding = False
 
     def merge(
         self, items: list[ContextItem]
@@ -85,16 +94,29 @@ class ConvergenceMerger:
             (kept, archived): kept includes new knowledge items; archived items
             are superseded by the merged result.
         """
-        # Only consider extracted, non-deleted, searchable items
+        # Only consider extracted, non-deleted, searchable items that have not
+        # already been merged. A source keeps ``searchable=True`` after a merge
+        # (its mid-grained detail stays retrievable) but carries ``superseded_by``;
+        # excluding those here stops a re-merge each compact from minting a fresh
+        # knowledge id, which would otherwise churn duplicate knowledge and — since
+        # the skill fingerprint keys on the source knowledge id — defeat skill
+        # idempotency and proliferate near-duplicate skills.
         candidates = [
             it
             for it in items
-            if it.stage == Stage.extracted and not it.is_deleted and it.searchable
+            if it.stage == Stage.extracted
+            and not it.is_deleted
+            and it.searchable
+            and not it.superseded_by
         ]
-        if len(candidates) < self._min_cluster:
+        # The smallest cluster we will ever accept: min_cluster normally, or the
+        # small-cluster size when the high-similarity small-cluster mode applies.
+        effective_min = min(self._min_cluster, self._small_cluster)
+        if len(candidates) < effective_min:
             return list(items), []
 
-        # Cluster by similarity
+        # Cluster by similarity. Track each member's similarity to the anchor so
+        # small clusters can be gated on a stricter similarity bar.
         clusters: list[list[ContextItem]] = []
         used: set[str] = set()
 
@@ -102,6 +124,7 @@ class ConvergenceMerger:
             if item_a.id in used:
                 continue
             cluster = [item_a]
+            member_sims: list[float] = []
             used.add(item_a.id)
             for j in range(i + 1, len(candidates)):
                 item_b = candidates[j]
@@ -110,9 +133,13 @@ class ConvergenceMerger:
                 sim = self._similarity(item_a, item_b)
                 if sim >= self._threshold:
                     cluster.append(item_b)
+                    member_sims.append(sim)
                     used.add(item_b.id)
-            if len(cluster) >= self._min_cluster:
+            if self._cluster_qualifies(cluster, member_sims):
                 clusters.append(cluster)
+            else:
+                # Release members so they stay available for solo promotion.
+                used.difference_update(it.id for it in cluster)
 
         if not clusters:
             return list(items), []
@@ -137,6 +164,20 @@ class ConvergenceMerger:
                 except Exception:
                     pass
 
+            # Signal conservation: usage/feedback evidence must aggregate across
+            # the merge boundary, never reset to zero (otherwise the merged
+            # knowledge would have to re-earn the demand its sources already
+            # proved). access_count sums; relevance_boost is access-weighted.
+            total_access = sum(it.access_count for it in cluster)
+            total_lineage = sum(it.lineage_access_count for it in cluster)
+            if total_access > 0:
+                merged_boost = (
+                    sum(it.relevance_boost * it.access_count for it in cluster)
+                    / total_access
+                )
+            else:
+                merged_boost = sum(it.relevance_boost for it in cluster) / len(cluster)
+
             # Create merged knowledge item
             merged = ContextItem(
                 id=_generate_id(),
@@ -157,6 +198,10 @@ class ConvergenceMerger:
                 ],
                 created_at=_utc_now(),
                 importance=max(it.importance for it in cluster),
+                access_count=total_access,
+                lineage_access_count=total_lineage,
+                relevance_boost=merged_boost,
+                promotion_path="converge",
             )
             kept.append(merged)
 
@@ -175,6 +220,25 @@ class ConvergenceMerger:
 
         return kept, archived
 
+    def _cluster_qualifies(
+        self, cluster: list[ContextItem], member_sims: list[float]
+    ) -> bool:
+        """Decide whether a candidate cluster is large/cohesive enough to merge.
+
+        A cluster qualifies if it reaches ``min_cluster_size`` at the normal
+        similarity bar, OR it reaches the (smaller) ``small_cluster_size`` while
+        every member is bound to the anchor above ``small_cluster_similarity``.
+        """
+        if len(cluster) >= self._min_cluster:
+            return True
+        if (
+            len(cluster) >= self._small_cluster
+            and member_sims
+            and min(member_sims) >= self._small_cluster_sim
+        ):
+            return True
+        return False
+
     def _similarity(self, a: ContextItem, b: ContextItem) -> float:
         """Compute similarity between two items."""
         # Prefer embedding similarity if available
@@ -182,6 +246,20 @@ class ConvergenceMerger:
             return embedding_similarity(a.embedding, b.embedding)
         if a.embedding and b.embedding:
             return embedding_similarity(a.embedding, b.embedding)
+        # No embeddings on either side: convergence degrades to token-overlap
+        # (Jaccard), which almost never crosses the semantic threshold. Warn once
+        # so operators know convergence is effectively off until an embedder is
+        # configured (instead of silently producing zero merges).
+        if not self._warned_no_embedding:
+            self._warned_no_embedding = True
+            warnings.warn(
+                "ConvergenceMerger is comparing items without embeddings; "
+                "similarity falls back to token-overlap (Jaccard) and rarely "
+                "triggers a merge. Configure an embedder so extracted items "
+                "carry vectors for reliable convergence.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
         return semantic_similarity(a.content_text, b.content_text)
 
 

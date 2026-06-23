@@ -121,6 +121,48 @@ class RetrieveResponse:
 
 
 @dataclass
+class EvolutionEvent:
+    """One evolution-pipeline event (module-5 observability, §8.1 contract).
+
+    Emitted while ``evolve()`` runs and flushed to the audit sink by
+    ``compact()``. The field set is the union the promotion lifecycle needs;
+    each event kind populates only the fields relevant to it and leaves the
+    rest at their defaults, so the serialized form stays compact.
+    """
+
+    event: str
+    """``usage_recorded`` | ``promotion_attempted`` | ``promotion_succeeded`` | ``promotion_rejected``."""
+
+    item_id: str
+    from_stage: str = ""
+    to_stage: str = ""
+    promotion_path: str = ""
+    """Candidate/actual path: ``extract`` | ``converge`` | ``solo`` | ``llm`` | ``distill`` | ``heuristic``."""
+
+    quality_score: float | None = None
+    lineage_access_count: int = 0
+    reject_reason: str = ""
+    ts: str = ""
+    """ISO-8601 UTC timestamp."""
+
+    def to_dict(self) -> dict:
+        payload: dict = {"event": self.event, "item_id": self.item_id, "ts": self.ts}
+        if self.from_stage:
+            payload["from_stage"] = self.from_stage
+        if self.to_stage:
+            payload["to_stage"] = self.to_stage
+        if self.promotion_path:
+            payload["promotion_path"] = self.promotion_path
+        if self.quality_score is not None:
+            payload["quality_score"] = self.quality_score
+        if self.lineage_access_count:
+            payload["lineage_access_count"] = self.lineage_access_count
+        if self.reject_reason:
+            payload["reject_reason"] = self.reject_reason
+        return payload
+
+
+@dataclass
 class CompactReport:
     """Return value of ``compact()``."""
 
@@ -138,6 +180,21 @@ class CompactReport:
 
     conflict_drift_count: int = 0
     """Incoming items quarantined as drift against higher-authority facts."""
+
+    stage_distribution: dict[str, int] = field(default_factory=dict)
+    """Inventory per stage after this cycle (滞留量) — the funnel snapshot."""
+
+    conversion: dict[str, dict[str, int]] = field(default_factory=dict)
+    """Per-hop flow keyed by ``"raw->extracted"`` etc → ``{attempted, succeeded, rejected}``."""
+
+    path_distribution: dict[str, int] = field(default_factory=dict)
+    """Counts of items produced this cycle by ``promotion_path``."""
+
+    avg_quality_score: float | None = None
+    """Mean ``quality_score`` across items scored this cycle, or None."""
+
+    events: list[EvolutionEvent] = field(default_factory=list)
+    """Structured §8.1 events, flushed to the audit sink by ``compact()``."""
 
     details: dict = field(default_factory=dict)
 
