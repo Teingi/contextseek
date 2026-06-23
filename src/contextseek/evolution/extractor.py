@@ -20,6 +20,26 @@ class Extractor(Protocol):
         """Extract insights from a raw ContextItem."""
 
 
+def _inherited_signal(source: ContextItem) -> dict[str, Any]:
+    """Usage/feedback signal that must survive the raw→extracted boundary.
+
+    Signal conservation (the same principle the merger/distiller already honor):
+    a raw item accrues fuel from retrieval auto-attribution and ``record_utility``
+    /``feedback``; zeroing it at the first hop would starve the downstream
+    solo-promotion and distill gates, so a retrieval-fueled note could never wake
+    up. ``lineage_access_count`` and ``relevance_boost`` therefore carry forward.
+    ``access_count`` stays 0 — it counts the *new* item's own hits.
+
+    When a raw fans out into several insights each child inherits the full
+    blood-line (never zero); the minor over-count if siblings later re-merge is
+    accepted as the lesser evil versus resetting the signal to zero.
+    """
+    return {
+        "lineage_access_count": source.lineage_access_count,
+        "relevance_boost": source.relevance_boost,
+    }
+
+
 class HeuristicExtractor:
     """Deterministic extractor that slices trace content into insights.
 
@@ -102,6 +122,7 @@ class HeuristicExtractor:
             tags=[tag, "auto_extracted"],
             links=[Link(target_id=source.id, relation=LinkType.derived_from)],
             created_at=_utc_now(),
+            **_inherited_signal(source),
         )
 
 
@@ -146,6 +167,7 @@ class LLMExtractor:
                 tags=["llm_summary", "text_extracted", "auto_extracted"],
                 links=[Link(target_id=item.id, relation=LinkType.derived_from)],
                 created_at=_utc_now(),
+                **_inherited_signal(item),
             )
         ]
 
@@ -188,6 +210,7 @@ class LLMExtractor:
                 tags=["llm_summary", "auto_extracted"],
                 links=[Link(target_id=item.id, relation=LinkType.derived_from)],
                 created_at=_utc_now(),
+                **_inherited_signal(item),
             )
         ]
 
@@ -322,4 +345,5 @@ class GeoExtractor:
             tags=["geo_extracted", "auto_extracted", *self._extra_tags],
             links=[Link(target_id=source.id, relation=LinkType.derived_from)],
             created_at=_utc_now(),
+            **_inherited_signal(source),
         )

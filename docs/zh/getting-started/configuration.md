@@ -179,7 +179,24 @@ OceanBase 另见 `OB_*` 与 [存储后端](../guides/storage.md)。
 | `EVOLUTION_ENABLED` | `false` | `compact()` 总开关 |
 | `EVOLUTION_SEMANTIC_MERGE_THRESHOLD` | `0.72` | 合并相似度阈值 |
 | `EVOLUTION_MIN_CLUSTER_SIZE` | `3` | 合并为 knowledge 的最小簇大小 |
+| `EVOLUTION_USAGE_ATTRIBUTION_MODE` | `inject` | 信号归因模式：`off`、`inject`、`cited` |
+| `EVOLUTION_INJECT_RELEVANCE_BOOST_STEP` | `0.02` | `inject` 模式下每次检索注入的 boost 步长 |
+| `EVOLUTION_TEXT_EXTRACT_MAX_AGE_DAYS` | `7.0` | 文本 raw 的年龄兜底阈值（天），超过后强制抽取一次 |
+| `EVOLUTION_SOLO_PROMOTE_ENABLED` | `true` | 是否启用孤立 extracted 直升 knowledge 的 solo 路径 |
+| `EVOLUTION_SOLO_PROMOTE_MIN_LINEAGE_ACCESS` | `3` | solo 晋级门槛：最小 `lineage_access_count` |
+| `EVOLUTION_SOLO_PROMOTE_MIN_BOOST` | `1.1` | solo 晋级门槛：最小 `relevance_boost` |
+| `EVOLUTION_SOLO_PROMOTE_MIN_AGE_DAYS` | `1.0` | solo 晋级门槛：最小条目年龄（天） |
+| `EVOLUTION_SMALL_CLUSTER_SIZE` | `2` | 小簇收敛模式的最小簇大小（用于“2 条 + 高相似”） |
+| `EVOLUTION_SMALL_CLUSTER_SIMILARITY` | `0.85` | 小簇收敛模式的相似度阈值 |
+| `EVOLUTION_HEURISTIC_DISTILL_ALLOW_RAW` | `false` | 是否允许 heuristic 旁路直接 `raw -> skill` |
+| `EVOLUTION_KNOWLEDGE_QUALITY_MIN_LEN` | `20` | knowledge 质量门最小内容长度 |
 | `EVOLUTION_LLM_*` | `false` | 各 LLM 增强子功能 |
+
+说明：
+
+- `EVOLUTION_USAGE_ATTRIBUTION_MODE=inject`：检索命中时直接计入正向归因（touch + 小幅 boost）。
+- `EVOLUTION_USAGE_ATTRIBUTION_MODE=cited`：检索阶段只 touch，不加 inject boost；在 `record_utility()` 中按“被使用/未使用”归因。
+- `EVOLUTION_HEURISTIC_DISTILL_ALLOW_RAW=false` 时，旁路蒸馏默认不允许 raw 直跳 skill。
 
 ### Dream（`DREAM_*`）
 

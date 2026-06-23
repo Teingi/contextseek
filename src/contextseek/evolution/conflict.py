@@ -28,7 +28,7 @@ from typing import Callable
 
 from contextseek.domain.context_item import ContextItem
 from contextseek.domain.links import Link, LinkType
-from contextseek.domain.stages import STAGE_CONFIDENCE
+from contextseek.domain.stages import STAGE_CONFIDENCE, Stage
 
 # Negation markers across English and Chinese — asymmetry between two otherwise
 # similar statements is a strong contradiction signal.
@@ -191,6 +191,31 @@ class ConflictResolver:
             incoming.links.append(
                 Link(target_id=existing.id, relation=LinkType.supersedes, strength=0.9)
             )
+        self._promote_winner(incoming)
+
+    def _promote_winner(self, incoming: ContextItem) -> None:
+        """Reward the fact that won a conflict against an established one.
+
+        Module 4: an item that supersedes a standing fact has proven itself the
+        authoritative version, so it gains confidence and importance rather than
+        being merely linked. An ``extracted`` winner is also nudged one stage up
+        to ``knowledge`` — a corroborated insight that beat an established fact is
+        knowledge-grade — while ``raw`` (needs extraction first) and ``knowledge``
+        are left for the normal pipeline. Tagged ``conflict_corroborated`` for
+        observability.
+        """
+        floor = STAGE_CONFIDENCE.get(incoming.stage, 0.3)
+        base = (
+            incoming.effective_confidence
+            if incoming.effective_confidence is not None
+            else incoming.provenance.confidence
+        )
+        incoming.effective_confidence = min(1.0, max(base, floor) + 0.1)
+        incoming.importance = min(5.0, incoming.importance * 1.1)
+        if incoming.stage == Stage.extracted:
+            incoming.stage = Stage.knowledge
+        if "conflict_corroborated" not in incoming.tags:
+            incoming.tags.append("conflict_corroborated")
 
     def _apply_drift(self, *, incoming: ContextItem, existing: ContextItem) -> None:
         incoming.close_validity(reason=f"drift_vs:{existing.id}")

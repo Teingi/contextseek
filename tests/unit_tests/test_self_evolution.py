@@ -6,8 +6,10 @@
 4. Failure-driven reflection — PitfallReflector
 """
 
+from dataclasses import replace
 from datetime import timedelta
 
+from contextseek.config.strategies import EvolutionStrategy, StrategyConfig
 from contextseek.domain.context_item import ContextItem, _generate_id, _utc_now
 from contextseek.domain.links import LinkType
 from contextseek.domain.provenance import Provenance, SourceType
@@ -18,6 +20,7 @@ from contextseek.domain.serialization import (
 from contextseek.domain.stages import Stage
 from contextseek.config.strategies import DreamStrategy
 from contextseek.evolution.conflict import ConflictResolver
+from contextseek.evolution.distiller import SkillDistiller
 from contextseek.evolution.dreaming import PitfallReflector, _is_failure_trace
 
 
@@ -172,7 +175,8 @@ class TestPitfallReflector:
         pit = result.items[0]
         assert "pitfall" in pit.tags
         assert pit.provenance.source_type == SourceType.pitfall_reflection
-        assert pit.stage == Stage.extracted
+        # Module 4: a pitfall is a special class of knowledge, not a raw insight.
+        assert pit.stage == Stage.knowledge
 
     def test_below_threshold_produces_nothing(self):
         strategy = DreamStrategy(pitfall_min_failures=5)
@@ -231,4 +235,152 @@ class TestClientIntegration:
         )
         assert used_after.relevance_boost > 1.0
         assert used_after.access_count >= 1
+        # Conserve the blood-line signal so this usage survives later evolution.
+        assert used_after.lineage_access_count >= 1
         assert unused_after.relevance_boost < 1.0
+
+    def test_cited_mode_retrieve_does_not_apply_inject_boost(self):
+        from contextseek.client.contextseek import ContextSeek
+
+        strategy = StrategyConfig(
+            evolution=replace(
+                EvolutionStrategy(),
+                usage_attribution_mode="cited",
+                inject_relevance_boost_step=0.5,
+            )
+        )
+        ctx = ContextSeek(strategy=strategy)
+        scope = "t/p/s"
+        item = ctx.add("deployment checklist", scope=scope, source="doc")
+
+        # Retrieval still touches (access + lineage), but cited mode must not
+        # apply the inject-path boost.
+        ctx.retrieve("deployment", scope=scope)
+        after = deserialize_context_item(
+            ctx.adapter.read(ctx.resolver.ref_for(scope, item.id))
+        )
+        assert after.access_count >= 1
+        assert after.relevance_boost == 1.0
+
+    def test_cited_mode_records_cited_and_negative_usage_events(self):
+        from contextseek.client.contextseek import ContextSeek
+        from contextseek.observability.audit import AuditLog
+
+        strategy = StrategyConfig(
+            evolution=replace(
+                EvolutionStrategy(),
+                usage_attribution_mode="cited",
+            )
+        )
+        ctx = ContextSeek(strategy=strategy, audit_log=AuditLog())
+        scope = "t/p/s"
+        used = ctx.add("useful deploy fact", scope=scope, source="doc")
+        unused = ctx.add("unused styling fact", scope=scope, source="doc")
+
+        ctx.record_utility(
+            scope=scope, retrieved_ids=[used.id, unused.id], used_ids=[used.id]
+        )
+        audit = [r for r in ctx.audit_log.records if r.action == "record_utility"][-1]
+        events = audit.detail.get("usage_events", [])
+        assert any(e.get("attribution_type") == "cited" for e in events)
+        assert any(e.get("attribution_type") == "negative" for e in events)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Module 4: lateral engines merged into the promotion spine
+# ════════════════════════════════════════════════════════════════════════════
+
+
+class TestConflictPromotesWinner:
+    def test_extracted_winner_promoted_to_knowledge(self):
+        # Older, low-confidence knowledge fact vs a newer, high-confidence
+        # extracted insight that contradicts and out-ranks it.
+        existing = _item(
+            "the server port is 8080",
+            stage=Stage.knowledge,
+            confidence=0.5,
+            created_at=_utc_now() - timedelta(days=2),
+        )
+        incoming = _item(
+            "the server port is 9090",
+            stage=Stage.extracted,
+            confidence=0.9,
+            created_at=_utc_now(),
+        )
+        res = ConflictResolver(similarity_threshold=0.5).resolve([existing, incoming])
+
+        assert res.verdicts and res.verdicts[0][2] == "update"
+        # Module 4: the winner is rewarded, not merely linked.
+        assert incoming.stage == Stage.knowledge
+        assert "conflict_corroborated" in incoming.tags
+        assert incoming.effective_confidence is not None
+        assert incoming.effective_confidence > 0.9
+
+    def test_winner_confidence_and_importance_rise(self):
+        existing = _item(
+            "deploy uses rolling strategy",
+            stage=Stage.knowledge,
+            confidence=0.5,
+            created_at=_utc_now() - timedelta(days=2),
+        )
+        incoming = _item(
+            "deploy uses blue-green strategy not rolling",
+            stage=Stage.knowledge,
+            confidence=0.9,
+            importance=1.0,
+            created_at=_utc_now(),
+        )
+        ConflictResolver(similarity_threshold=0.5).resolve([existing, incoming])
+        # knowledge winner keeps its stage but still gains importance + tag.
+        assert incoming.stage == Stage.knowledge
+        assert incoming.importance > 1.0
+        assert "conflict_corroborated" in incoming.tags
+
+
+class TestPitfallLineageAndDistillation:
+    def test_pitfall_inherits_blood_line_usage(self):
+        strategy = DreamStrategy(pitfall_min_failures=2)
+        reflector = PitfallReflector(strategy=strategy)
+        failures = [
+            _item(
+                content={"input": "deploy service", "error": "timeout connecting db"},
+                stage=Stage.raw,
+                tags=["failure"],
+                lineage_access_count=4,
+            )
+            for _ in range(3)
+        ]
+        result = reflector.reflect(failures)
+        pit = result.items[0]
+        # Signal conservation: pitfall carries the blood-line of the traces.
+        assert pit.lineage_access_count == 12  # 3 × 4
+        assert pit.promotion_path == "pitfall_reflection"
+
+    def test_distiller_prioritizes_pitfall_knowledge(self):
+        # A pitfall knowledge item with zero usage is still a distillation
+        # candidate — a recurring lesson is inherently worth an avoid-skill.
+        pitfall = _item(
+            "avoid deploying without running migrations first",
+            stage=Stage.knowledge,
+            tags=["pitfall", "avoid"],
+            access_count=0,
+            lineage_access_count=0,
+            relevance_boost=1.0,
+        )
+        candidates = SkillDistiller(
+            min_use_count=5, min_relevance_boost=1.1
+        ).identify_candidates([pitfall])
+        assert [c.id for c in candidates] == [pitfall.id]
+
+    def test_non_pitfall_low_usage_knowledge_not_candidate(self):
+        plain = _item(
+            "some rarely used knowledge note",
+            stage=Stage.knowledge,
+            access_count=0,
+            lineage_access_count=0,
+            relevance_boost=1.0,
+        )
+        candidates = SkillDistiller(
+            min_use_count=5, min_relevance_boost=1.1
+        ).identify_candidates([plain])
+        assert candidates == []

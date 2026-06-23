@@ -24,6 +24,7 @@ def serialize_context_item(item: ContextItem) -> dict[str, Any]:
         "relevance_boost": item.relevance_boost,
         "importance": item.importance,
         "access_count": item.access_count,
+        "lineage_access_count": item.lineage_access_count,
         "created_at": _dt_to_str(item.created_at),
         "provenance": _serialize_provenance(item.provenance),
         "tags": item.tags,
@@ -49,6 +50,10 @@ def serialize_context_item(item: ContextItem) -> dict[str, Any]:
         payload["invalidated_reason"] = item.invalidated_reason
     if item.effective_confidence is not None:
         payload["effective_confidence"] = item.effective_confidence
+    if item.quality_score is not None:
+        payload["quality_score"] = item.quality_score
+    if item.promotion_path is not None:
+        payload["promotion_path"] = item.promotion_path
     if item.deleted_at:
         payload["deleted_at"] = _dt_to_str(item.deleted_at)
         payload["deleted_reason"] = item.deleted_reason
@@ -76,6 +81,9 @@ def deserialize_context_item(payload: dict[str, Any]) -> ContextItem:
         relevance_boost=payload.get("relevance_boost", 1.0),
         importance=payload.get("importance", 1.0),
         access_count=payload.get("access_count", 0),
+        lineage_access_count=payload.get("lineage_access_count", 0),
+        quality_score=payload.get("quality_score"),
+        promotion_path=payload.get("promotion_path"),
         links=links,
         effective_confidence=payload.get("effective_confidence"),
         created_at=_str_to_dt(payload["created_at"]),

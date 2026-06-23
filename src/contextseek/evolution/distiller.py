@@ -7,14 +7,46 @@ compatible with Hermes, SuperAGI, and any Markdown-injection agent pattern.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Any, Callable
 
 from contextseek.domain.context_item import ContextItem, _generate_id, _utc_now
 from contextseek.domain.links import Link, LinkType
 from contextseek.domain.provenance import Provenance, SourceType
+from contextseek.domain.skill_ir import SkillIR
 from contextseek.domain.stages import Stage, Stability
+
+
+def _is_pitfall(item: ContextItem) -> bool:
+    """Whether an item is a pitfall lesson (a ``PitfallReflector`` product)."""
+    return "pitfall" in item.tags
+
+
+def _globs_from(item: ContextItem, tags: list[str]) -> list[str]:
+    """Heuristic file globs for IDE-rule adapters (Cursor/Windsurf, later slices).
+
+    Derived from language/path-ish tags so a skill can hint *where* it applies;
+    empty when nothing path-like is present (prompt skills with no scope cue).
+    """
+    ext_map = {
+        "python": "**/*.py",
+        "py": "**/*.py",
+        "typescript": "**/*.ts",
+        "ts": "**/*.ts",
+        "javascript": "**/*.js",
+        "react": "**/*.tsx",
+        "go": "**/*.go",
+        "rust": "**/*.rs",
+        "sql": "**/*.sql",
+    }
+    globs: list[str] = []
+    for tag in tags:
+        glob = ext_map.get(tag.lower())
+        if glob and glob not in globs:
+            globs.append(glob)
+    return globs
 
 
 @dataclass
@@ -29,6 +61,39 @@ class HeuristicDistillRule:
     min_access_count: int = 5
     min_age_days: float = 3.0
     min_relevance_boost: float = 1.1
+
+
+_PLACEHOLDER_NAME_RE = re.compile(r"^skill_[0-9a-f]{6,}$")
+
+
+def _skill_quality(content: Any) -> tuple[float, bool]:
+    """Score a distilled skill's structural quality in [0, 1].
+
+    Rewards a non-placeholder name, a meaningful description, and a body with a
+    real instruction structure (Overview + Usage/Steps). A truncated-string
+    heuristic skill (placeholder name, single Overview snippet) scores below the
+    0.6 pass bar so callers can flag it ``needs_review`` and keep it out of the
+    export surface.
+    """
+    if not isinstance(content, dict):
+        return 0.0, False
+    name = str(content.get("name", "") or "")
+    desc = str(content.get("description", "") or "")
+    body = str(content.get("body", "") or "")
+
+    score = 0.0
+    if name and not _PLACEHOLDER_NAME_RE.match(name):
+        score += 0.34
+    if desc.strip() and len(desc.strip()) >= 12:
+        score += 0.33
+    body_len = len(body.strip())
+    has_overview = "Overview" in body
+    has_usage = "Usage" in body or "Steps" in body
+    if body_len >= 60 and has_overview and has_usage:
+        score += 0.33
+    elif body_len >= 40:
+        score += 0.15
+    return round(score, 3), score >= 0.6
 
 
 # Keywords that signal procedure-like content in tags or extracted text.
@@ -114,27 +179,61 @@ class SkillDistiller:
         self._heuristic_rule = heuristic_rule
 
     def identify_candidates(self, items: list[ContextItem]) -> list[ContextItem]:
-        """Find knowledge items eligible for skill distillation."""
-        candidates = [
+        """Find knowledge items eligible for skill distillation.
+
+        Filter and decision are decoupled (fixes the dead regular path):
+        - With an LLM decider, a usage-qualified set (own or lineage access over
+          ``min_use``, positive boost) is handed to the LLM **without** a
+          ``_is_procedure`` pre-gate, so non-procedure-tagged merge products are
+          no longer silently excluded before the LLM ever sees them.
+        - Without an LLM, candidacy broadens beyond procedure structure to also
+          accept knowledge that has been repeatedly used successfully (high
+          lineage usage + positive boost).
+        """
+        base = [
             it
             for it in items
-            if it.stage == Stage.knowledge
-            and not it.is_deleted
-            and it.searchable
-            and self._is_procedure(it)
-            and it.access_count >= self._min_use
-            and it.relevance_boost >= self._min_boost
+            if it.stage == Stage.knowledge and not it.is_deleted and it.searchable
         ]
-        if self._llm_decide is None:
-            return candidates
-        decided: list[ContextItem] = []
-        for item in candidates:
-            try:
-                if self._llm_decide(item):
+
+        if self._llm_decide is not None:
+            qualified = [
+                it
+                for it in base
+                if _is_pitfall(it)
+                or (
+                    (
+                        it.access_count >= self._min_use
+                        or it.lineage_access_count >= self._min_use
+                    )
+                    and it.relevance_boost >= self._min_boost
+                )
+            ]
+            decided: list[ContextItem] = []
+            for item in qualified:
+                try:
+                    if self._llm_decide(item):
+                        decided.append(item)
+                except Exception:
                     decided.append(item)
-            except Exception:
-                decided.append(item)
-        return decided
+            return decided
+
+        return [
+            it
+            for it in base
+            # Module 4: a pitfall is a recurring failure lesson — always worth an
+            # "avoid this" skill, so it bypasses the usage/procedure bar.
+            if _is_pitfall(it)
+            or (
+                self._is_procedure(it)
+                and it.access_count >= self._min_use
+                and it.relevance_boost >= self._min_boost
+            )
+            or (
+                it.lineage_access_count >= self._min_use
+                and it.relevance_boost >= self._min_boost
+            )
+        ]
 
     def distill(self, item: ContextItem) -> ContextItem:
         """Produce a prompt skill item from a knowledge item.
@@ -158,6 +257,10 @@ class SkillDistiller:
         name = _infer_name(item, skill_id_short)
         description = _infer_description(item)
         body = _format_as_markdown(item)
+        # An LLM render may also supply a richer kind + parameter schema; default
+        # to a prompt skill with an empty schema otherwise.
+        kind = "prompt"
+        parameters: dict[str, Any] = {"type": "object", "properties": {}}
         if self._llm_distill is not None:
             try:
                 llm_payload = self._llm_distill(item)
@@ -167,6 +270,10 @@ class SkillDistiller:
                     description = llm_payload["description"][:400]
                 if llm_payload.get("body"):
                     body = llm_payload["body"]
+                if llm_payload.get("skill_type") in ("prompt", "tool", "mcp", "code"):
+                    kind = llm_payload["skill_type"]
+                if isinstance(llm_payload.get("parameters"), dict):
+                    parameters = llm_payload["parameters"]
             except Exception:
                 pass
 
@@ -182,14 +289,20 @@ class SkillDistiller:
         }
         inherited_tags = [t for t in item.tags if t not in _skip]
 
-        skill_content = {
-            "skill_type": "prompt",
-            "name": name,
-            "description": description,
-            "version": "1.0.0",
-            "tags": inherited_tags,
-            "body": body,
-        }
+        ir = SkillIR(
+            name=name,
+            description=description,
+            body=body,
+            kind=kind,
+            tags=inherited_tags,
+            parameters=parameters,
+            globs=_globs_from(item, inherited_tags),
+            publish_status="drafted",
+        ).assign_identity(item.id)
+        skill_content = ir.to_content()
+
+        quality_score, _ = _skill_quality(skill_content)
+        promotion_path = "llm" if (self._llm_decide or self._llm_distill) else "distill"
 
         return ContextItem(
             id=skill_id,
@@ -207,6 +320,11 @@ class SkillDistiller:
             links=[Link(target_id=item.id, relation=LinkType.distilled_into)],
             created_at=_utc_now(),
             importance=item.importance,
+            access_count=item.access_count,
+            lineage_access_count=item.lineage_access_count,
+            relevance_boost=item.relevance_boost,
+            quality_score=quality_score,
+            promotion_path=promotion_path,
         )
 
     def identify_heuristic_candidates(
@@ -267,14 +385,24 @@ class SkillDistiller:
             }
         ]
 
-        skill_content = {
-            "skill_type": "prompt",
-            "name": name,
-            "description": description,
-            "version": "1.0.0",
-            "tags": inherited_tags,
-            "body": f"## Overview\n\n{body}",
-        }
+        ir = SkillIR(
+            name=name,
+            description=description,
+            body=f"## Overview\n\n{body}",
+            kind="prompt",
+            tags=inherited_tags,
+            globs=_globs_from(item, inherited_tags),
+            publish_status="drafted",
+        ).assign_identity(item.id)
+        skill_content = ir.to_content()
+
+        # Quality gate: a truncated-text heuristic skill rarely has a complete
+        # structure, so flag sub-par products as needs_review (and record a low
+        # quality_score) instead of relying on the 0.75 confidence number alone.
+        quality_score, ok = _skill_quality(skill_content)
+        skill_tags = ["prompt_skill", "heuristic_skill"] + inherited_tags
+        if not ok and "needs_review" not in skill_tags:
+            skill_tags.append("needs_review")
 
         return ContextItem(
             id=skill_id,
@@ -291,10 +419,15 @@ class SkillDistiller:
             ),
             stage=Stage.skill,
             stability=Stability.permanent,
-            tags=["prompt_skill", "heuristic_skill"] + inherited_tags,
+            tags=skill_tags,
             links=[Link(target_id=item.id, relation=LinkType.distilled_into)],
             created_at=_utc_now(),
             importance=item.importance,
+            access_count=item.access_count,
+            lineage_access_count=item.lineage_access_count,
+            relevance_boost=item.relevance_boost,
+            quality_score=quality_score,
+            promotion_path="heuristic",
         )
 
     def _is_procedure(self, item: ContextItem) -> bool:

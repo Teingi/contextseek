@@ -80,14 +80,24 @@ class MCPRuntime:
             result = {
                 "protocolVersion": "2024-11-05",
                 "serverInfo": {"name": "contextseek-mcp", "version": PACKAGE_VERSION},
-                "capabilities": {"tools": {}},
+                "capabilities": {"tools": {}, "prompts": {}},
                 "sessionId": session_id,
             }
             return _success_response(request_id=request_id, result=result)
         if method == "tools/list":
+            # Optional scope mounts evolution-produced skills as live tools.
             return _success_response(
-                request_id=request_id, result={"tools": self.server.list_tools()}
+                request_id=request_id,
+                result={"tools": self.server.list_tools(scope=params.get("scope"))},
             )
+        if method == "prompts/list":
+            prompts = self.server.list_prompts(str(params.get("scope", "")))
+            return _success_response(request_id=request_id, result={"prompts": prompts})
+        if method == "prompts/get":
+            result = self.server.get_prompt(
+                str(params.get("scope", "")), str(params.get("name", ""))
+            )
+            return _success_response(request_id=request_id, result=result)
         if method == "tools/call":
             name = str(params.get("name", ""))
             arguments = dict(params.get("arguments", {}))

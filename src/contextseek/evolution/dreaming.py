@@ -277,6 +277,14 @@ class ConsolidationEngine:
             "content": primary.content,
         }
 
+        # Module 4: a consolidation pattern is a synthesis, not a raw insight, so
+        # it lands directly in the knowledge layer (it does not need to re-earn
+        # convergence). Signal conservation: it inherits the cluster's blood-line
+        # usage so the demand that produced it is not reset at this boundary.
+        lineage = sum(it.lineage_access_count for it in cluster)
+        access = max((it.access_count for it in cluster), default=0)
+        boost = max((it.relevance_boost for it in cluster), default=1.0)
+
         return ContextItem(
             id=_generate_id(),
             # content is a dict: the LLM/fallback summary plus the highest-authority
@@ -284,15 +292,19 @@ class ConsolidationEngine:
             # embedding source and tight-budget display stay text, not str(dict).
             content={"pattern": pattern_text, "primary_evidence": primary_evidence},
             abstract=pattern_text,
+            summary=pattern_text,
             scope=cluster[0].scope,
             provenance=Provenance(
                 source_type=SourceType.dream_consolidation,
                 source_id=cluster[0].id,
-                confidence=self._strategy.dream_initial_confidence,
+                confidence=max(
+                    self._strategy.dream_initial_confidence,
+                    STAGE_CONFIDENCE.get(Stage.knowledge, 0.85) - 0.1,
+                ),
                 context=f"Consolidated from {len(cluster)} related items",
             ),
-            stage=Stage.extracted,
-            stability=Stability.transient,
+            stage=Stage.knowledge,
+            stability=Stability.stable,
             tags=["dreamed", "consolidation"]
             + sorted(common_tags - {"dreamed", "consolidation", "divergence"}),
             links=[
@@ -300,6 +312,10 @@ class ConsolidationEngine:
                 for it in cluster
             ],
             importance=0.5,
+            access_count=access,
+            lineage_access_count=lineage,
+            relevance_boost=boost,
+            promotion_path="dream_consolidation",
         )
 
     @property
@@ -381,6 +397,12 @@ class DivergenceEngine:
                     f"[{', '.join(sorted(tags_b)[:3])}] may share underlying patterns"
                 )
 
+        # Module 4: a divergence hypothesis stays at the extracted layer — it is
+        # speculative and must earn promotion through normal convergence. It
+        # still inherits its sources' blood-line usage so a hypothesis born from
+        # heavily-used items carries that signal into the verification race.
+        lineage = a.lineage_access_count + b.lineage_access_count
+
         return ContextItem(
             id=_generate_id(),
             content=hypothesis_text,
@@ -399,6 +421,8 @@ class DivergenceEngine:
                 Link(target_id=b.id, relation=LinkType.synthesized_from, strength=0.4),
             ],
             importance=0.4,
+            lineage_access_count=lineage,
+            promotion_path="dream_divergence",
         )
 
 
@@ -567,10 +591,17 @@ class PitfallReflector:
             common_tags &= set(it.tags)
         carried = sorted(common_tags - _FAILURE_TAGS - {"auto_extracted"})
 
+        # Module 4: a recurring pitfall is a special class of knowledge (tag
+        # ``pitfall``) — it lands in the knowledge layer and inherits the
+        # blood-line usage of the failed traces it generalizes, so distillation
+        # can prioritize turning it into an "avoid this" skill.
+        lineage = sum(it.lineage_access_count for it in cluster)
+
         return ContextItem(
             id=_generate_id(),
             content=rule_text,
             abstract=rule_text,
+            summary=rule_text,
             scope=cluster[0].scope,
             provenance=Provenance(
                 source_type=SourceType.pitfall_reflection,
@@ -578,14 +609,16 @@ class PitfallReflector:
                 confidence=self._strategy.pitfall_initial_confidence,
                 context=f"Reflected from {len(cluster)} failed traces",
             ),
-            stage=Stage.extracted,
-            stability=Stability.transient,
+            stage=Stage.knowledge,
+            stability=Stability.stable,
             tags=["pitfall", "avoid"] + carried,
             links=[
                 Link(target_id=it.id, relation=LinkType.synthesized_from, strength=0.5)
                 for it in cluster
             ],
             importance=0.6,
+            lineage_access_count=lineage,
+            promotion_path="pitfall_reflection",
         )
 
 
