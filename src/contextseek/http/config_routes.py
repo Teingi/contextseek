@@ -281,7 +281,11 @@ def register_config_routes(app: Any, *, config_dir: Path) -> None:
         mgr.apply(_materializer())
         if http_server._is_desktop_runtime():
             http_server._schedule_server_restart()
-            return {"status": "ok", "restart_required": False, "restart_scheduled": True}
+            return {
+                "status": "ok",
+                "restart_required": False,
+                "restart_scheduled": True,
+            }
         return {"status": "ok", "version_id": v.version_id, "restart_required": True}
 
     @app.get("/config/history")
