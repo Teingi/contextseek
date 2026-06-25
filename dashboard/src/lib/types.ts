@@ -342,6 +342,12 @@ export interface Config {
   sqlite_path?: string;
   // File (storage_backend === "file")
   storage_path?: string;
+  // ---- optional enrichment fields (config versioning / AgentSeek projection) ----
+  config_version?: string;
+  override_sources?: Record<string, "native" | "projected:agentseek">;
+  drift?: ConfigDrift;
+  agentseek_source_ref?: string | null;
+  agentseek_stale?: boolean;
 }
 
 export interface ConfigUpdateRequest {
@@ -486,4 +492,43 @@ export interface SkillMdRequest {
 
 export interface SkillMdResponse {
   skills: SkillMdItem[];
+}
+
+// ---- config versioning / history ----
+
+export interface ConfigHistoryEntry {
+  version_id: string;
+  parent_version_id: string | null;
+  created_at: string;
+  origin: string;
+  author: string;
+  reason: string;
+}
+
+export interface ConfigBlame {
+  version_id: string;
+  origin: string;
+  author: string;
+  reason: string;
+  source_ref?: string | null;
+  value: unknown;
+}
+
+export interface ConfigDiff {
+  added: string[];
+  changed: string[];
+  removed: string[];
+}
+
+export interface ConfigDrift {
+  env: boolean;
+  runtime: boolean;
+}
+
+export interface ConfigStatus {
+  current_version: string | null;
+  version_count: number;
+  store_dir: string;
+  drift: ConfigDrift;
+  verify_problems: string[];
 }
