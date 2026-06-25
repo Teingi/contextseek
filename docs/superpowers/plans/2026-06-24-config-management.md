@@ -969,7 +969,6 @@ def test_effective_to_env_passes_through_extra_env():
 ```
 
 > 注：`effective_to_env` 在写完反射出的 settings 字段后，必须再把 `effective.get("_extra_env", {})` 里的每个 `KEY=value` 原样追加，确保迁移时未被 settings 跟踪的 env 变量不丢。`dry_run_validate` / `expected_hashes` / `detect_drift` 都经 `effective_to_env`，因此自动一致。
-```
 
 - [ ] **Step 2: Run test to verify it fails**
 
