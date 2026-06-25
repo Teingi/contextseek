@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("fastapi", reason="http extra not installed")
 from fastapi.testclient import TestClient
 
 

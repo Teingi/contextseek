@@ -255,6 +255,8 @@ def register_config_routes(app: Any, *, config_dir: Path) -> None:
 
     @app.put("/config")
     async def update_config(req: dict[str, Any]) -> dict[str, Any]:
+        from contextseek.http import server as http_server
+
         mgr = _manager(config_dir)
         _ensure_migrated(mgr)
         # Preserve embedding-provider validation UX (see _normalize_embedding_updates).
@@ -277,6 +279,9 @@ def register_config_routes(app: Any, *, config_dir: Path) -> None:
             }
         v = mgr.set_native_many(updates, author="dashboard", reason="dashboard edit")
         mgr.apply(_materializer())
+        if http_server._is_desktop_runtime():
+            http_server._schedule_server_restart()
+            return {"status": "ok", "restart_required": False, "restart_scheduled": True}
         return {"status": "ok", "version_id": v.version_id, "restart_required": True}
 
     @app.get("/config/history")
