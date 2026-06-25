@@ -86,6 +86,12 @@ def register_config_subparser(subparsers: Any) -> None:
     p_ingest_agent.add_argument("--apply", action="store_true")
     p_ingest_agent.add_argument("--author", default="agentseek")
 
+    p_import = sub.add_parser("import", help="import existing .env / config.json as v1")
+    p_import.add_argument("--from-env", default=None, help="path to .env (default: resolved .env)")
+    p_import.add_argument("--from-runtime", default=None, help="path to config.json (default: CONTEXTSEEK_CONFIG)")
+    p_import.add_argument("--apply", action="store_true")
+    p_import.add_argument("--author", default="system")
+
 
 def run_config_command(args: argparse.Namespace) -> int:
     """Dispatch a ``config`` subcommand. Returns process exit code."""
@@ -189,5 +195,20 @@ def run_config_command(args: argparse.Namespace) -> int:
                 mgr.apply(_default_materializer())
                 print("applied to .env + config.json")
             return 0
+
+    if cmd == "import":
+        from contextseek.config.migrator import migrate_into
+
+        env_path = Path(args.from_env) if args.from_env else None
+        rt_path = Path(args.from_runtime) if args.from_runtime else None
+        v = migrate_into(mgr, env_path=env_path, runtime_path=rt_path, author=args.author)
+        if v is None:
+            print("store already initialized; nothing to import")
+            return 0
+        print(f"imported as {v.version_id} (origin=migration)")
+        if args.apply:
+            mgr.apply(_default_materializer())
+            print("applied to .env + config.json")
+        return 0
 
     return 1
