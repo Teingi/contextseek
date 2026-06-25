@@ -149,7 +149,7 @@ def test_history_limit_respected(manager: ConfigManager):
 
 
 def test_rollback_is_append_only(manager: ConfigManager):
-    v1 = manager.set_native("llm.model", "gpt-4o", author="a", reason="r1")
+    manager.set_native("llm.model", "gpt-4o", author="a", reason="r1")
     manager.set_native("llm.model", "gpt-4o-mini", author="a", reason="r2")
     v3 = manager.rollback("v000001", author="a", reason="rollback to v1")
     assert v3.version_id == "v000003"
