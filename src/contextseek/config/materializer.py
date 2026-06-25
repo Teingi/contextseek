@@ -21,6 +21,8 @@ from typing import Any
 from contextseek.config.envreflector import iter_section_env_fields
 from contextseek.config.settings import ContextSeekSettings
 
+SUPPORTED_STORAGE_BACKENDS = frozenset({"memory", "file", "sqlite", "seekdb", "oceanbase"})
+
 
 def _flat_get(d: dict, dotted_key: str) -> Any:
     cur: Any = d
@@ -86,6 +88,9 @@ class Materializer:
 
     def dry_run_validate(self, effective: dict) -> tuple[bool, str | None]:
         """Return ``(ok, error)``. ``ok`` iff both loaders can construct from effective."""
+        backend = _flat_get(effective, "storage.backend")
+        if backend is not None and backend not in SUPPORTED_STORAGE_BACKENDS:
+            return False, f"unsupported storage backend: {backend}"
         env_text = effective_to_env(effective)
         # Validate ContextSeekSettings by populating a fake env and constructing.
         # Backup → set → construct → restore, guarded by try/finally so a

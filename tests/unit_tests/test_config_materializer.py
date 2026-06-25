@@ -44,6 +44,12 @@ def test_dry_run_validate_ok_for_minimal(materializer: Materializer):
     assert err is None
 
 
+def test_dry_run_validate_rejects_unknown_backend(materializer: Materializer):
+    ok, err = materializer.dry_run_validate({"storage": {"backend": "not-a-real-backend"}})
+    assert ok is False
+    assert "unsupported storage backend" in err
+
+
 def test_detect_drift_when_file_hand_edited(materializer: Materializer, tmp_path: Path):
     eff = {"llm": {"model": "gpt-4o"}}
     materializer.materialize(eff)
