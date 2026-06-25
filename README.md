@@ -72,6 +72,21 @@ contextseek retrieve --scope me/work --query "..." # retrieve from the CLI or ex
 
 See the [CLI guide](docs/en/guides/cli.md) for the full command reference.
 
+## Configuration management
+
+ContextSeek ships a versioned, traceable, rollback-able configuration store:
+
+```bash
+contextseek config import --apply          # first-time: ingest existing .env/config.json as v1
+contextseek config set llm.model gpt-4o --reason "init llm"
+contextseek config history
+contextseek config rollback v000001
+contextseek config ingest agentseek --path agentseek.env --apply
+contextseek config verify
+```
+
+Every change is an append-only version with provenance (author, reason, origin). Rollback creates a new version — history is never deleted. agentseek config can be ingested and projected into the `projected` layer without reverse-writing agentseek.
+
 ## Core concepts in 60 seconds
 
 - **`ContextItem`** — the single object for memory, knowledge, traces, and skills. It carries content, a `stage`, mandatory `Provenance`, and typed `Link` edges.
