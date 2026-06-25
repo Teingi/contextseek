@@ -146,3 +146,71 @@ def test_history_limit_respected(manager: ConfigManager):
     for i in range(5):
         manager.set_native("llm.model", f"m{i}", author="a", reason=f"r{i}")
     assert len(manager.history(n=3)) == 3
+
+
+def test_rollback_is_append_only(manager: ConfigManager):
+    v1 = manager.set_native("llm.model", "gpt-4o", author="a", reason="r1")
+    manager.set_native("llm.model", "gpt-4o-mini", author="a", reason="r2")
+    v3 = manager.rollback("v000001", author="a", reason="rollback to v1")
+    assert v3.version_id == "v000003"
+    assert v3.origin == "rollback"
+    assert v3.parent_version_id == "v000002"
+    assert v3.payload["effective"]["llm"]["model"] == "gpt-4o"
+    # v000002 仍在历史中
+    ids = [h.version_id for h in manager.history()]
+    assert "v000002" in ids
+    assert manager.current().version_id == "v000003"
+
+
+def test_redo_reverts_last_rollback(manager: ConfigManager):
+    manager.set_native("llm.model", "gpt-4o", author="a", reason="r1")
+    manager.set_native("llm.model", "gpt-4o-mini", author="a", reason="r2")
+    manager.rollback("v000001", author="a", reason="back")
+    v4 = manager.redo(author="a", reason="undo rollback")
+    assert v4 is not None
+    assert v4.payload["effective"]["llm"]["model"] == "gpt-4o-mini"
+    assert v4.parent_version_id == "v000003"
+
+
+def test_redo_returns_none_when_last_not_rollback(manager: ConfigManager):
+    manager.set_native("llm.model", "gpt-4o", author="a", reason="r1")
+    assert manager.redo(author="a", reason="x") is None
+
+
+def test_diff_between_versions(manager: ConfigManager):
+    manager.set_native("llm.model", "gpt-4o", author="a", reason="r1")
+    manager.set_native("llm.model", "gpt-4o-mini", author="a", reason="r2")
+    d = manager.diff("v000001", "v000002")
+    assert "llm.model" in d["changed"]
+
+
+def test_blame_finds_last_change(manager: ConfigManager):
+    manager.set_native("llm.model", "gpt-4o", author="a", reason="r1")
+    manager.set_native("llm.provider", "openai", author="b", reason="r2")
+    blame = manager.blame("llm.model")
+    assert blame["version_id"] == "v000001"
+    assert blame["reason"] == "r1"
+    blame_provider = manager.blame("llm.provider")
+    assert blame_provider["version_id"] == "v000002"
+
+
+def test_verify_passes_on_clean_store(manager: ConfigManager):
+    manager.set_native("llm.model", "gpt-4o", author="a", reason="r1")
+    assert manager.verify() == []
+
+
+def test_verify_detects_tampered_payload(manager: ConfigManager, tmp_path: Path):
+    manager.set_native("llm.model", "gpt-4o", author="a", reason="r1")
+    path = tmp_path / "config" / "history" / "v000001.json"
+    raw = json.loads(path.read_text())
+    raw["payload"]["effective"]["llm"]["model"] = "tampered"
+    path.write_text(json.dumps(raw))
+    problems = manager.verify()
+    assert any("hash" in p for p in problems)
+
+
+def test_status_reports_current_and_count(manager: ConfigManager):
+    manager.set_native("llm.model", "gpt-4o", author="a", reason="r1")
+    s = manager.status()
+    assert s["current_version"] == "v000001"
+    assert s["version_count"] == 1

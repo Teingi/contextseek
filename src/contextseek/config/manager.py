@@ -288,3 +288,146 @@ class ConfigManager:
             "changed": sorted(changed),
             "removed": sorted(removed),
         }
+
+    # ------------------------------------------------------- rollback/redo
+    def rollback(self, target_version_id: str, *, author: str, reason: str) -> ConfigVersion:
+        """Create a new version whose payload equals ``target_version_id``'s.
+
+        Append-only: the target and any versions after it remain in history.
+        """
+        target = self.get_version(target_version_id)
+        return self.commit(
+            native=dict(target.payload.get("native", {})),
+            projected=dict(target.payload.get("projected", {})),
+            origin="rollback",
+            author=author,
+            reason=reason,
+        )
+
+    def redo(self, *, author: str, reason: str) -> ConfigVersion | None:
+        """Undo the most recent rollback by re-applying the version it reverted.
+
+        Returns None if the latest version is not a rollback.
+        """
+        cur = self.current()
+        if cur is None or cur.origin != "rollback":
+            return None
+        # The version immediately before the rollback is what was reverted.
+        prev = self.get_version(cur.parent_version_id)
+        return self.commit(
+            native=dict(prev.payload.get("native", {})),
+            projected=dict(prev.payload.get("projected", {})),
+            origin="manual",
+            author=author,
+            reason=reason,
+        )
+
+    # --------------------------------------------------------------- diff
+    def diff(self, a: str, b: str) -> dict:
+        va = self.get_version(a)
+        vb = self.get_version(b)
+        return self._diff_payloads(
+            va.payload.get("effective", {}), vb.payload.get("effective", {})
+        )
+
+    # -------------------------------------------------------------- blame
+    def blame(self, key: str) -> dict | None:
+        """Find the most recent version where ``key``'s effective value was set."""
+        hist = self.history()  # newest first
+        if not hist:
+            return None
+        current_val = self._flat_get(hist[0].payload.get("effective", {}), key)
+        prev_val = None
+        prev_eff = hist[1].payload.get("effective", {}) if len(hist) > 1 else {}
+        prev_val = self._flat_get(prev_eff, key)
+        if current_val != prev_val or len(hist) == 1:
+            v = hist[0]
+            return {
+                "version_id": v.version_id,
+                "origin": v.origin,
+                "author": v.author,
+                "reason": v.reason,
+                "source_ref": v.source_ref,
+                "value": current_val,
+            }
+        # walk backwards to the introducing version
+        for i, v in enumerate(hist):
+            val = self._flat_get(v.payload.get("effective", {}), key)
+            older = hist[i + 1] if i + 1 < len(hist) else None
+            older_val = (
+                self._flat_get(older.payload.get("effective", {}), key) if older else None
+            )
+            if val != older_val:
+                return {
+                    "version_id": v.version_id,
+                    "origin": v.origin,
+                    "author": v.author,
+                    "reason": v.reason,
+                    "source_ref": v.source_ref,
+                    "value": val,
+                }
+        return None
+
+    @staticmethod
+    def _flat_get(d: dict, dotted_key: str) -> Any:
+        cur: Any = d
+        for part in dotted_key.split("."):
+            if not isinstance(cur, dict) or part not in cur:
+                return None
+            cur = cur[part]
+        return cur
+
+    # ------------------------------------------------------------- verify
+    def verify(self) -> list[str]:
+        """Return a list of problems with the store (empty == OK)."""
+        problems: list[str] = []
+        if not self.manifest_path.exists():
+            return problems
+        records = [
+            json.loads(line)
+            for line in self.manifest_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        expected_parent: str | None = None
+        for rec in records:
+            path = self.history_dir / f"{rec['version_id']}.json"
+            if not path.exists():
+                problems.append(f"missing version file: {rec['version_id']}")
+                continue
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            actual_hash = _payload_hash(raw["payload"])
+            if actual_hash != rec["payload_hash"]:
+                problems.append(
+                    f"payload hash mismatch in {rec['version_id']} "
+                    f"(manifest={rec['payload_hash']}, file={actual_hash})"
+                )
+            if rec["parent_version_id"] != expected_parent:
+                problems.append(
+                    f"parent chain broken at {rec['version_id']}: "
+                    f"expected parent {expected_parent}, got {rec['parent_version_id']}"
+                )
+            expected_parent = rec["version_id"]
+        # current.json must match newest version's payload hash
+        if records and self.current_path.exists():
+            cur_payload = json.loads(self.current_path.read_text(encoding="utf-8"))
+            newest = self._load_version(
+                self.history_dir / f"{records[-1]['version_id']}.json"
+            )
+            if _payload_hash(cur_payload) != newest.payload_hash:
+                problems.append("current.json does not match newest version payload")
+        return problems
+
+    # ------------------------------------------------------------- status
+    def status(self) -> dict:
+        cur = self.current()
+        count = 0
+        if self.manifest_path.exists():
+            count = sum(
+                1 for line in self.manifest_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            )
+        return {
+            "current_version": cur.version_id if cur else None,
+            "version_count": count,
+            "store_dir": str(self.config_dir),
+        }
