@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ConfigHistorySection } from "@/panels/components/ConfigHistorySection";
 import { ctx } from "@/lib/ctxClient";
 import { useI18n } from "@/lib/i18n";
 import type { Config, ConfigTestResponse, ConfigUpdateRequest, Health } from "@/lib/types";
@@ -103,6 +104,7 @@ function EditableRow({
   isEditing,
   isPassword,
   placeholder,
+  overrideSource,
   onChange,
 }: {
   label: string;
@@ -111,6 +113,7 @@ function EditableRow({
   isEditing: boolean;
   isPassword?: boolean;
   placeholder?: string;
+  overrideSource?: "native" | "projected:agentseek";
   onChange: (val: string) => void;
 }) {
   const [showPlain, setShowPlain] = useState(false);
@@ -120,7 +123,14 @@ function EditableRow({
     return (
       <div className="flex items-center justify-between py-1.5">
         <span className="text-xs text-muted-foreground">{label}</span>
-        <span className="text-xs font-medium">{display}</span>
+        <span className="flex items-center gap-2">
+          <span className="text-xs font-medium">{display}</span>
+          {overrideSource && (
+            <Badge variant="outline" className="px-1 py-0 text-[10px]">
+              {overrideSource}
+            </Badge>
+          )}
+        </span>
       </div>
     );
   }
@@ -552,6 +562,10 @@ export function SettingsPanel() {
 
   const aboutRows = [{ label: t("settings.about.version"), value: val(config?.version) }];
 
+  // override-source badges: read from config.override_sources (keyed by field name)
+  const overrideSources = config?.override_sources ?? {};
+  const srcFor = (key: string) => overrideSources[key];
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
       {/* Restart confirmation dialog */}
@@ -674,6 +688,7 @@ export function SettingsPanel() {
                 draftValue={draft.llm_model}
                 isEditing={isEditing}
                 placeholder="provider/model"
+                overrideSource={srcFor("llm_model")}
                 onChange={(v) => setField("llm_model", v)}
               />
               <EditableRow
@@ -682,6 +697,7 @@ export function SettingsPanel() {
                 draftValue={draft.llm_base_url}
                 isEditing={isEditing}
                 placeholder="https://api.openai.com/v1"
+                overrideSource={srcFor("llm_base_url")}
                 onChange={(v) => setField("llm_base_url", v)}
               />
               <EditableRow
@@ -691,6 +707,7 @@ export function SettingsPanel() {
                 isEditing={isEditing}
                 isPassword
                 placeholder="sk-..."
+                overrideSource={srcFor("llm_api_key")}
                 onChange={(v) => setField("llm_api_key", v)}
               />
               <ConnectionTestRow
@@ -722,6 +739,7 @@ export function SettingsPanel() {
                 draftValue={draft.embedding_model}
                 isEditing={isEditing}
                 placeholder="provider/model"
+                overrideSource={srcFor("embedding_model")}
                 onChange={(v) => setField("embedding_model", v)}
               />
               <EditableRow
@@ -730,6 +748,7 @@ export function SettingsPanel() {
                 draftValue={draft.embedding_dims}
                 isEditing={isEditing}
                 placeholder="auto"
+                overrideSource={srcFor("embedding_dims")}
                 onChange={(v) => setField("embedding_dims", v)}
               />
               <EditableRow
@@ -738,6 +757,7 @@ export function SettingsPanel() {
                 draftValue={draft.embedding_base_url}
                 isEditing={isEditing}
                 placeholder="https://api.openai.com/v1"
+                overrideSource={srcFor("embedding_base_url")}
                 onChange={(v) => setField("embedding_base_url", v)}
               />
               <EditableRow
@@ -747,6 +767,7 @@ export function SettingsPanel() {
                 isEditing={isEditing}
                 isPassword
                 placeholder="sk-..."
+                overrideSource={srcFor("embedding_api_key")}
                 onChange={(v) => setField("embedding_api_key", v)}
               />
               <ConnectionTestRow
@@ -949,6 +970,9 @@ export function SettingsPanel() {
       <SettingsGroup icon={Info} title={t("settings.about")} desc={t("settings.about.desc")}>
         <StatRows rows={aboutRows} />
       </SettingsGroup>
+
+      {/* Config version history / rollback / agentseek ingest */}
+      <ConfigHistorySection />
     </div>
   );
 }

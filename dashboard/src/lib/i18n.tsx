@@ -352,6 +352,11 @@ const zh: Dict = {
   "settings.llm.apiKey": "api_key",
   "settings.embedder.baseUrl": "base_url",
   "settings.embedder.apiKey": "api_key",
+
+  // config versioning
+  "config.history": "版本历史",
+  "config.rollback": "回滚",
+  "config.ingestAgentseek": "摄入 AgentSeek",
 };
 
 const en: Dict = {
@@ -661,6 +666,11 @@ const en: Dict = {
   "settings.llm.apiKey": "api_key",
   "settings.embedder.baseUrl": "base_url",
   "settings.embedder.apiKey": "api_key",
+
+  // config versioning
+  "config.history": "Version history",
+  "config.rollback": "Rollback",
+  "config.ingestAgentseek": "Ingest AgentSeek",
 };
 
 const ja: Dict = {
@@ -970,6 +980,11 @@ const ja: Dict = {
   "settings.llm.apiKey": "api_key",
   "settings.embedder.baseUrl": "base_url",
   "settings.embedder.apiKey": "api_key",
+
+  // config versioning
+  "config.history": "バージョン履歴",
+  "config.rollback": "ロールバック",
+  "config.ingestAgentseek": "AgentSeek 取り込み",
 };
 
 const DICTS: Record<Lang, Dict> = { zh, en, ja };
