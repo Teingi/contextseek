@@ -167,19 +167,97 @@ contextseek config ingest agentseek --apply
 
 投影后，`show --layer projected` 能看到 agentseek 投影过来的值，`show --layer effective` 看到合并结果。若 `native` 显式设了同 key，`native` 优先（`blame` / `status` 会标出 `override_source`）。
 
-## 7. Dashboard 体验
+## 7. 在 Dashboard 上实操
 
-启动 dashboard（HTTP 服务同时提供配置管理端点）后，打开 **Settings 面板**：
+Dashboard 是一个 React SPA，由 ContextSeek 的 HTTP 服务**同源**提供（API 在 `/config/...`，SPA 在 `/`）。配置管理的所有版本化能力在 Settings 面板里都能点着操作。
 
-- **编辑区**：照常改 LLM / Embedding / Storage 等字段，保存即通过版本化 API 提交，每次编辑成为一个版本（`author=dashboard`）。
-- **版本历史区**（编辑区下方）：
-  - 版本链列表（版本号 / 时间 / origin / author / reason）。
-  - 当前版本徽章；**drift** 徽章（`.env` 被手改时变红）。
-  - 每行可展开看版本元数据；非当前版本有「回退」按钮。
-  - 顶部「摄入 agentseek」按钮触发投影。
-- **override 徽章**：每个配置项旁标注来源（`native` / `projected:agentseek`），冲突项一目了然。
+### 7.1 启动
 
-API 层（供前端或脚本调用）：
+需要先构建一次 SPA（产出 `dashboard/dist`），再起服务。两种方式任选：
+
+**方式 A：同源单进程（推荐，API + SPA 同一个端口）**
+
+```bash
+# 1) 构建 SPA（一次性）
+make desktop-spa            # 或：cd dashboard && npm install && npm run build
+
+# 2) 起服务（API + SPA 都在 :8000）
+make desktop-server         # 或：uv run contextseek desktop-server --port 8000
+```
+
+打开浏览器访问 `http://127.0.0.1:8000`。
+
+**方式 B：前后端分离开发（前端热更新）**
+
+```bash
+make backend                # API 在 :8000（--reload）
+make frontend               # 构建并 vite preview 在 :3000，需后端在 :8000
+```
+
+打开 `http://127.0.0.1:3000`（前端通过 `VITE_CTX_BASE` 代理到 :8000）。
+
+> 直接 `uv run python -m uvicorn contextseek.http.server:app --port 8000` 也行——只要 `dashboard/dist` 存在，SPA 就会挂在 `/`；dist 不存在时退化为纯 API 模式。
+
+### 7.2 隔离 demo 环境（不污染本机配置）
+
+配置管理用 `${CONTEXTSEEK_HOME:-.contextseek}/config/` 作托管库，物化文件落到 CWD 的 `.env`/`config.json`。建议先用隔离目录体验：
+
+```bash
+mkdir -p /tmp/ctx-dash-demo && cd /tmp/ctx-dash-demo
+cat > .env <<'EOF'
+STORAGE_BACKEND=file
+STORAGE_PATH=/tmp/ctx-dash-demo/store
+LLM_PROVIDER=none
+EMBEDDING_PROVIDER=none
+DEFAULT_SCOPE=demo
+EOF
+export CONTEXTSEEK_HOME=/tmp/ctx-dash-demo/home
+export CONTEXTSEEK_ENV_FILE=/tmp/ctx-dash-demo/.env
+
+uv run python -m uvicorn contextseek.http.server:app --host 127.0.0.1 --port 8001
+```
+
+打开 `http://127.0.0.1:8001`。首次访问 `GET /config` 会**懒迁移**：自动把 `.env` 导入为 `v000001`（`origin=migration`），无需手动 `import`。
+
+### 7.3 在 Settings 面板操作
+
+进入左侧 **Settings** 面板，从上到下：
+
+**编辑区（顶部）**
+- 改 LLM / Embedder / Storage 等字段，保存即通过版本化 API 提交，每次编辑成为一个版本（`author=dashboard`）并物化到 `.env`。
+- 每个字段右侧有 **override 徽章**：`native`（你设的）/ `projected:agentseek`（agentseek 投影来的），冲突项一目了然。
+- 顶部状态条显示**当前版本号** + **drift 徽章**（`.env` 被手改时变红）。
+
+**版本历史区（编辑区下方）**
+- 版本链列表：`版本号 · 时间 · origin · author · reason`（首条是 `origin=migration`）。
+- 每行可展开看版本元数据；非当前版本有**「回退」按钮**（append-only 回退 + 自动物化）。
+- 顶部**「摄入 agentseek」按钮**触发投影（demo 环境没配 agentseek 会提示无新内容）。
+
+### 7.4 推荐的点一遍的体验串
+
+1. 把 LLM Model 改成 `gpt-4o`，保存 → 历史区多一条 `manual` 版本。
+2. 再改成 `gpt-4o-mini`，保存 → 又一条。
+3. 在历史区对第一条点「回退」→ `.env` 回到 `gpt-4o`。
+4. 此时最新版本是 `rollback`；用 API `POST /config/redo` 可撤销回退（UI 的 redo 按钮待接入，见 §9）。
+5. 手改 `/tmp/ctx-dash-demo/.env`（随便加一行），回 dashboard 看状态条 **drift 徽章变红** → 检测到手改漂移；点一次编辑保存或调 `config apply` 即重物化、转绿。
+
+### 7.5 用 curl 旁路验证
+
+dashboard 调用的就是这些端点，可同时用 curl 对照：
+
+```bash
+B=http://127.0.0.1:8001
+curl -s $B/config/history | python3 -m json.tool
+curl -s "$B/config/blame?key=llm.model" | python3 -m json.tool
+curl -s $B/config/verify
+curl -s $B/config/status | python3 -m json.tool
+curl -s -X POST $B/config/rollback -H 'Content-Type: application/json' \
+  -d '{"version":"v000001","reason":"回到初始"}'
+```
+
+### 7.6 配置管理 HTTP API
+
+供前端或脚本调用：
 
 | 方法 | 路径 | 作用 |
 |---|---|---|
