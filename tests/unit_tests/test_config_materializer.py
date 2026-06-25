@@ -16,7 +16,9 @@ from contextseek.config.materializer import (
 
 @pytest.fixture()
 def materializer(tmp_path: Path) -> Materializer:
-    return Materializer(env_path=tmp_path / ".env", runtime_path=tmp_path / "config.json")
+    return Materializer(
+        env_path=tmp_path / ".env", runtime_path=tmp_path / "config.json"
+    )
 
 
 def test_effective_to_env_writes_known_keys():
@@ -26,7 +28,9 @@ def test_effective_to_env_writes_known_keys():
 
 
 def test_effective_to_runtime_json_includes_runtime_section():
-    rt = effective_to_runtime_json({"runtime": {"backend": "file", "storage_path": "/data"}})
+    rt = effective_to_runtime_json(
+        {"runtime": {"backend": "file", "storage_path": "/data"}}
+    )
     assert rt["backend"] == "file"
     assert rt["storage_path"] == "/data"
 
@@ -45,7 +49,9 @@ def test_dry_run_validate_ok_for_minimal(materializer: Materializer):
 
 
 def test_dry_run_validate_rejects_unknown_backend(materializer: Materializer):
-    ok, err = materializer.dry_run_validate({"storage": {"backend": "not-a-real-backend"}})
+    ok, err = materializer.dry_run_validate(
+        {"storage": {"backend": "not-a-real-backend"}}
+    )
     assert ok is False
     assert "unsupported storage backend" in err
 
@@ -66,3 +72,15 @@ def test_effective_to_env_passes_through_extra_env():
     )
     assert "LLM_MODEL=gpt-4o" in env
     assert "SOME_OTHER_VAR=keep-me" in env
+
+
+def test_effective_to_env_serializes_dict_kwargs_as_json():
+    # dict-valued settings fields (LLM_KWARGS) must be valid JSON, not a repr.
+    env = effective_to_env({"llm": {"kwargs": {"api_key": "sk-x"}}})
+    import json as _json
+
+    # find the LLM_KWARGS line
+    line = next(ln for ln in env.splitlines() if ln.startswith("LLM_KWARGS="))
+    raw = line.split("=", 1)[1]
+    parsed = _json.loads(raw)  # must parse
+    assert parsed == {"api_key": "sk-x"}

@@ -18,6 +18,22 @@ def test_import_existing_maps_env_to_native(tmp_path: Path):
     assert native["_extra_env"]["SOME_OTHER"] == "keep"
 
 
+def test_import_existing_parses_kwargs_json_into_dict(tmp_path: Path):
+    # LLM_KWARGS is a dict field exposed as a JSON string; import must parse it
+    # so a later set_native("llm.kwargs.api_key", ...) can walk into the dict.
+    env = tmp_path / ".env"
+    env.write_text('LLM_KWARGS={"api_key":"sk-imported","timeout":30}\n')
+    native = import_existing(env_path=env, runtime_path=None)
+    assert native["llm"]["kwargs"] == {"api_key": "sk-imported", "timeout": 30}
+
+
+def test_import_existing_keeps_kwargs_raw_on_bad_json(tmp_path: Path):
+    env = tmp_path / ".env"
+    env.write_text("LLM_KWARGS=not-json-but-starts-with-text\n")
+    native = import_existing(env_path=env, runtime_path=None)
+    assert native["llm"]["kwargs"] == "not-json-but-starts-with-text"
+
+
 def test_migrate_into_creates_v1_migration(tmp_path: Path):
     env = tmp_path / ".env"
     env.write_text("LLM_MODEL=gpt-4o\n")

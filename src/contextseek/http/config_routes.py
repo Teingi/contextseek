@@ -11,6 +11,14 @@ from contextseek.config.manager import ConfigManager
 from contextseek.config.materializer import Materializer
 from contextseek.config.migrator import migrate_into
 
+# Flat dashboard fields whose target is a leaf *inside* a dict-valued settings
+# field (no direct env leaf). Routed to the dotted path into the kwargs dict so
+# the key survives the versioned store → materialize → reload round-trip.
+FLAT_TO_DOTTED_OVERRIDE: dict[str, str] = {
+    "llm_api_key": "llm.kwargs.api_key",
+    "embedding_api_key": "embedding.kwargs.api_key",
+}
+
 # Flat dashboard field → env var (mirrors server.py's existing FIELD_TO_ENV).
 FIELD_TO_ENV: dict[str, str] = {
     "storage_backend": "STORAGE_BACKEND",
@@ -102,6 +110,10 @@ def register_config_routes(app: Any, *, config_dir: Path) -> None:
     reverse = env_to_section_field()
 
     def _flat_field_to_dotted(field_name: str) -> str | None:
+        # API keys live inside the dict-valued kwargs field — route them to the
+        # dotted path into that dict instead of the (non-existent) env leaf.
+        if field_name in FLAT_TO_DOTTED_OVERRIDE:
+            return FLAT_TO_DOTTED_OVERRIDE[field_name]
         env = FIELD_TO_ENV.get(field_name)
         if env is None or env not in reverse:
             return None
@@ -120,7 +132,9 @@ def register_config_routes(app: Any, *, config_dir: Path) -> None:
         snapshot = _build_config_snapshot()
         snapshot["config_version"] = cur.version_id if cur else None
         snapshot["override_sources"] = cur.override_sources if cur else {}
-        snapshot["drift"] = mgr.status().get("drift", {"env": False, "runtime": False})
+        snapshot["drift"] = _materializer().detect_drift(
+            cur.payload.get("effective", {}) if cur else {}
+        )
         # agentseek source staleness
         agentseek_ref = None
         for v in mgr.history():
@@ -173,7 +187,9 @@ def register_config_routes(app: Any, *, config_dir: Path) -> None:
         ]
 
     @app.get("/config/version/{version_id}")
-    async def version_detail(version_id: str, layer: str = "effective") -> dict[str, Any]:
+    async def version_detail(
+        version_id: str, layer: str = "effective"
+    ) -> dict[str, Any]:
         mgr = _manager(config_dir)
         v = mgr.get_version(version_id)
         return v.payload.get(layer, {})
@@ -192,7 +208,9 @@ def register_config_routes(app: Any, *, config_dir: Path) -> None:
     @app.post("/config/rollback")
     async def rollback(req: dict[str, Any]) -> dict[str, Any]:
         mgr = _manager(config_dir)
-        v = mgr.rollback(req["version"], author="dashboard", reason=req.get("reason", "rollback"))
+        v = mgr.rollback(
+            req["version"], author="dashboard", reason=req.get("reason", "rollback")
+        )
         mgr.apply(_materializer())
         return {"version_id": v.version_id, "restart_required": True}
 

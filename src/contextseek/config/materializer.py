@@ -21,7 +21,9 @@ from typing import Any
 from contextseek.config.envreflector import iter_section_env_fields
 from contextseek.config.settings import ContextSeekSettings
 
-SUPPORTED_STORAGE_BACKENDS = frozenset({"memory", "file", "sqlite", "seekdb", "oceanbase"})
+SUPPORTED_STORAGE_BACKENDS = frozenset(
+    {"memory", "file", "sqlite", "seekdb", "oceanbase"}
+)
 
 
 def _flat_get(d: dict, dotted_key: str) -> Any:
@@ -36,6 +38,10 @@ def _flat_get(d: dict, dotted_key: str) -> Any:
 def _render_value(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
+    if isinstance(value, (dict, list)):
+        # Settings-backed dict/list fields (e.g. LLM_KWARGS) must be valid JSON
+        # so pydantic-settings can parse them back; a Python repr would break.
+        return json.dumps(value, ensure_ascii=False)
     return str(value)
 
 
@@ -147,14 +153,20 @@ class Materializer:
         env_hash, rt_hash = self.expected_hashes(effective)
         env_drift = True
         if self.env_path.exists():
-            actual = "sha256:" + hashlib.sha256(
-                self.env_path.read_text(encoding="utf-8").encode("utf-8")
-            ).hexdigest()
+            actual = (
+                "sha256:"
+                + hashlib.sha256(
+                    self.env_path.read_text(encoding="utf-8").encode("utf-8")
+                ).hexdigest()
+            )
             env_drift = actual != env_hash
         rt_drift = True
         if self.runtime_path.exists():
-            actual = "sha256:" + hashlib.sha256(
-                self.runtime_path.read_text(encoding="utf-8").encode("utf-8")
-            ).hexdigest()
+            actual = (
+                "sha256:"
+                + hashlib.sha256(
+                    self.runtime_path.read_text(encoding="utf-8").encode("utf-8")
+                ).hexdigest()
+            )
             rt_drift = actual != rt_hash
         return {"env": env_drift, "runtime": rt_drift}

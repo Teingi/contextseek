@@ -65,3 +65,41 @@ def test_config_status_endpoint(client):
     body = r.json()
     assert "current_version" in body
     assert "drift" in body
+
+
+def test_put_config_preserves_api_key_round_trip(
+    client, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    # The dashboard edits api keys via flat fields; they must persist through
+    # the store → materialize → reload round-trip (Fix 1).
+    client.get("/config")  # trigger lazy migration
+    r = client.put("/config", json={"llm_api_key": "sk-roundtrip"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "ok"
+    assert body["version_id"] == "v000002"
+    # Simulate the server restart: reload the materialized .env into os.environ
+    # so ``ContextSeekSettings()`` (read by ``_build_config_snapshot``) sees it.
+    env_path = tmp_path / ".env"
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or "=" not in line or line.lstrip().startswith("#"):
+            continue
+        k, v = line.split("=", 1)
+        monkeypatch.setenv(k, v)
+    # GET /config reads llm_api_key via _build_config_snapshot -> s.llm.kwargs.get("api_key")
+    r2 = client.get("/config")
+    assert r2.status_code == 200
+    assert r2.json()["llm_api_key"] == "sk-roundtrip"
+
+
+def test_get_config_reports_real_drift(client, tmp_path: Path):
+    # GET /config's drift must reflect a hand-edited .env, not a placeholder (Fix 2).
+    client.get("/config")  # lazy migrate
+    # A PUT applies the effective config to .env, establishing a no-drift baseline.
+    client.put("/config", json={"llm_model": "gpt-4o"})
+    assert client.get("/config").json()["drift"]["env"] is False
+    # hand-edit the .env file
+    env_path = tmp_path / ".env"
+    env_path.write_text(env_path.read_text() + "\n# tampered\n")
+    body = client.get("/config").json()
+    assert body["drift"]["env"] is True

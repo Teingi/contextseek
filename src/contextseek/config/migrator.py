@@ -35,9 +35,7 @@ def _set_path(nested: dict, dotted_key: str, value: Any) -> None:
     cur[parts[-1]] = value
 
 
-def import_existing(
-    env_path: Path | None, runtime_path: Path | None
-) -> dict:
+def import_existing(env_path: Path | None, runtime_path: Path | None) -> dict:
     """Build a ``native`` payload from existing ``.env`` / ``config.json`` files."""
     native: dict = {"_extra_env": {}}
     reverse = env_to_section_field()
@@ -47,7 +45,22 @@ def import_existing(
             for key, value in _parse_env_file(env_path).items():
                 if key in reverse:
                     section, field = reverse[key]
-                    _set_path(native, f"{section}.{field}", value)
+                    stored: Any = value
+                    # ``kwargs`` is a dict field exposed as a JSON env string
+                    # (LLM_KWARGS/EMBEDDING_KWARGS). Parse it back into a dict
+                    # so a later ``set_native("llm.kwargs.api_key", ...)``
+                    # can walk into it.
+                    if (
+                        field == "kwargs"
+                        and isinstance(value, str)
+                        and value
+                        and value[0] in "{["
+                    ):
+                        try:
+                            stored = json.loads(value)
+                        except (json.JSONDecodeError, ValueError):
+                            stored = value
+                    _set_path(native, f"{section}.{field}", stored)
                 else:
                     native["_extra_env"][key] = value
     if runtime_path is not None:
