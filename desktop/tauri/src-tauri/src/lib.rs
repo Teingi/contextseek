@@ -14,7 +14,7 @@ use std::{collections::VecDeque, time::Instant};
 use serde::Serialize;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, RunEvent, WebviewWindow};
+use tauri::{AppHandle, Manager, RunEvent, WebviewWindow, WindowEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
@@ -25,14 +25,22 @@ const HEALTH_POLL_TIMEOUT_MS: u64 = 700;
 const HEALTH_STATUS_TIMEOUT_MS: u64 = 180;
 const SHUTDOWN_GRACE_MS: u64 = 3500;
 const MAX_CRASH_RESTARTS_PER_MIN: usize = 3;
+const MAX_START_ATTEMPTS: usize = 2;
 const CRASH_WINDOW_SECS: u64 = 60;
 const CRASH_RESTART_BACKOFF_MS: u64 = 1200;
 
 /// Shared runtime state: the live sidecar child and the port it serves on.
 #[derive(Default)]
+struct SidecarRuntime {
+    child: Option<CommandChild>,
+    port: u16,
+    generation: u64,
+    intentional_stop: Option<u64>,
+}
+
+#[derive(Default)]
 struct AppState {
-    child: Mutex<Option<CommandChild>>,
-    port: Mutex<u16>,
+    runtime: Mutex<SidecarRuntime>,
     crash_restarts: Mutex<VecDeque<Instant>>,
 }
 
@@ -43,17 +51,34 @@ struct BackendStatus {
     url: Option<String>,
 }
 
-/// Return FIXED_PORT if bindable, otherwise an OS-assigned free port.
-fn pick_port() -> u16 {
+fn port_bindable(port: u16) -> bool {
     use std::net::TcpListener;
-    if TcpListener::bind(("127.0.0.1", FIXED_PORT)).is_ok() {
+    TcpListener::bind(("127.0.0.1", port)).is_ok()
+}
+
+/// Return FIXED_PORT if bindable, otherwise an OS-assigned free port.
+/// When retrying after a bind race, avoid reusing the failed port.
+fn pick_port_avoiding(avoid: Option<u16>) -> u16 {
+    use std::net::TcpListener;
+    if avoid != Some(FIXED_PORT) && port_bindable(FIXED_PORT) {
         return FIXED_PORT;
     }
-    TcpListener::bind(("127.0.0.1", 0))
-        .ok()
-        .and_then(|l| l.local_addr().ok())
-        .map(|a| a.port())
-        .unwrap_or(FIXED_PORT)
+    for _ in 0..16 {
+        if let Some(port) = TcpListener::bind(("127.0.0.1", 0))
+            .ok()
+            .and_then(|l| l.local_addr().ok())
+            .map(|a| a.port())
+        {
+            if Some(port) != avoid {
+                return port;
+            }
+        }
+    }
+    if avoid == Some(FIXED_PORT) {
+        0
+    } else {
+        FIXED_PORT
+    }
 }
 
 /// Spawn the Python sidecar on `port`; store the child in state.
@@ -78,11 +103,14 @@ fn spawn_sidecar(app: &AppHandle, port: u16) -> Result<(), String> {
         .spawn()
         .map_err(|e| format!("sidecar spawn failed: {e}"))?;
 
-    {
+    let generation = {
         let state = app.state::<AppState>();
-        *state.child.lock().unwrap() = Some(child);
-        *state.port.lock().unwrap() = port;
-    }
+        let mut runtime = state.runtime.lock().unwrap();
+        runtime.generation = runtime.generation.saturating_add(1);
+        runtime.child = Some(child);
+        runtime.port = port;
+        runtime.generation
+    };
 
     // Drain sidecar output; surface unexpected termination to the UI.
     let app_for_events = app.clone();
@@ -94,9 +122,23 @@ fn spawn_sidecar(app: &AppHandle, port: u16) -> Result<(), String> {
                 }
                 CommandEvent::Terminated(payload) => {
                     eprintln!("[sidecar] terminated: {:?}", payload.code);
-                    {
+                    let should_auto_restart_after_exit = {
                         let state = app_for_events.state::<AppState>();
-                        *state.child.lock().unwrap() = None;
+                        let mut runtime = state.runtime.lock().unwrap();
+                        if runtime.generation != generation {
+                            false
+                        } else {
+                            runtime.child = None;
+                            if runtime.intentional_stop == Some(generation) {
+                                runtime.intentional_stop = None;
+                                false
+                            } else {
+                                true
+                            }
+                        }
+                    };
+                    if !should_auto_restart_after_exit {
+                        break;
                     }
                     if let Some(win) = app_for_events.get_webview_window("main") {
                         let _ = win.eval(
@@ -121,7 +163,7 @@ fn spawn_sidecar(app: &AppHandle, port: u16) -> Result<(), String> {
 
 fn current_port(app: &AppHandle) -> u16 {
     let state = app.state::<AppState>();
-    let port = *state.port.lock().unwrap();
+    let port = state.runtime.lock().unwrap().port;
     port
 }
 
@@ -200,18 +242,48 @@ fn start_backend(app: &AppHandle) {
     // Kill any previous child first (used by the tray "Restart service").
     kill_sidecar(app);
 
-    let port = pick_port();
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = spawn_sidecar(&app_handle, port) {
-            eprintln!("{e}");
-        }
-        let healthy =
-            tauri::async_runtime::spawn_blocking(move || wait_for_health(port))
-                .await
-                .unwrap_or(false);
-        if let Some(win) = app_handle.get_webview_window("main") {
-            show_app_or_diagnostic(&win, healthy, port);
+        let mut avoid_port = None;
+        for attempt in 0..MAX_START_ATTEMPTS {
+            let port = pick_port_avoiding(avoid_port);
+            if port == 0 {
+                if let Some(win) = app_handle.get_webview_window("main") {
+                    show_app_or_diagnostic(&win, false, avoid_port.unwrap_or(FIXED_PORT));
+                }
+                return;
+            }
+            if let Err(e) = spawn_sidecar(&app_handle, port) {
+                eprintln!("{e}");
+                if let Some(win) = app_handle.get_webview_window("main") {
+                    show_app_or_diagnostic(&win, false, port);
+                }
+                return;
+            }
+            let healthy =
+                tauri::async_runtime::spawn_blocking(move || wait_for_health(port))
+                    .await
+                    .unwrap_or(false);
+            if healthy {
+                if let Some(win) = app_handle.get_webview_window("main") {
+                    show_app_or_diagnostic(&win, true, port);
+                }
+                return;
+            }
+
+            let retryable_bind_conflict = !port_bindable(port);
+            eprintln!(
+                "[desktop] backend failed health check on port {port}; retryable_bind_conflict={retryable_bind_conflict}"
+            );
+            kill_sidecar(&app_handle);
+            if retryable_bind_conflict && attempt + 1 < MAX_START_ATTEMPTS {
+                avoid_port = Some(port);
+                continue;
+            }
+            if let Some(win) = app_handle.get_webview_window("main") {
+                show_app_or_diagnostic(&win, false, port);
+            }
+            return;
         }
     });
 }
@@ -219,8 +291,14 @@ fn start_backend(app: &AppHandle) {
 /// Terminate the sidecar child if running.
 fn kill_sidecar(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let port = *state.port.lock().unwrap();
-    let child = state.child.lock().unwrap().take();
+    let (port, child) = {
+        let mut runtime = state.runtime.lock().unwrap();
+        let child = runtime.child.take();
+        if child.is_some() {
+            runtime.intentional_stop = Some(runtime.generation);
+        }
+        (runtime.port, child)
+    };
     if let Some(child) = child {
         // Ask the sidecar to shutdown gracefully first; if it does not exit
         // within the grace period, force-kill the process.
@@ -311,6 +389,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![]),
@@ -326,9 +405,16 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building ContextSeek desktop app")
         .run(|app, event| match event {
-            // Keep running in the tray when the last window is closed.
-            RunEvent::ExitRequested { api, .. } => {
-                api.prevent_exit();
+            // Keep running in the tray when the main window is closed.
+            RunEvent::WindowEvent {
+                label,
+                event: WindowEvent::CloseRequested { api, .. },
+                ..
+            } if label == "main" => {
+                api.prevent_close();
+                if let Some(w) = app.get_webview_window(&label) {
+                    let _ = w.hide();
+                }
             }
             RunEvent::Exit => {
                 kill_sidecar(app);
